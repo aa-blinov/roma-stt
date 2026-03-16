@@ -129,13 +129,13 @@ def main() -> int:
         if any("без кода" in r for _, r in busy[:5]):
             print(
                 "Если везде «False без кода» — так бывает при запуске из консоли (python.exe).\n"
-                "Используйте пункт 9: введите комбинацию вручную (например Ctrl+Shift+F12),\n"
-                "затем пункт 6: при запуске программы хоткей зарегистрируется в нормальном процессе."
+                "Используйте пункты 7 и 8: введите комбинации вручную (например Ctrl+F2, Ctrl+F3),\n"
+                "затем пункт 3: при запуске программы хоткеи зарегистрируются в нормальном процессе."
             )
         else:
             print(
                 "Комбинации заняты другими программами или системой.\n"
-                "Закройте приложения с глобальными хоткеями или укажите свою в пункте 9."
+                "Закройте приложения с глобальными хоткеями или укажите свои в пунктах 7 и 8."
             )
         return 1
 
@@ -144,32 +144,48 @@ def main() -> int:
     for idx, hk in enumerate(free, start=1):
         print(f"  {idx}. {hk}")
     print(
-        "  (если в пункте 6 выбранная комбинация окажется занятой — подберётся запасная;\n"
-        "   закрепите её снова через пункт 8 или 9)"
+        "  (если в пункте 3 выбранная комбинация окажется занятой — подберётся запасная;\n"
+        "   закрепите снова через пункт 6, 7 или 8)"
     )
 
     print()
     cfg = load_config()
-    current = cfg.get("hotkey", "Ctrl+F9")
-    print(f"Текущая комбинация из config.yaml: {current}")
-    choice = input("Введите номер, чтобы записать в config.yaml (или Enter, чтобы ничего не менять): ").strip()
-    if not choice:
+    current_record = cfg.get("hotkey_record", "Ctrl+F2")
+    current_stop = cfg.get("hotkey_stop", "Ctrl+F3")
+    print(f"Текущие в config.yaml: запись = {current_record}, стоп = {current_stop}")
+    choice_record = input("Номер для клавиши ЗАПИСИ (Enter = не менять): ").strip()
+    choice_stop = input("Номер для клавиши СТОП (Enter = не менять): ").strip()
+    if not choice_record and not choice_stop:
         print("Конфиг не изменён.")
         return 0
-    try:
-        n = int(choice)
-    except ValueError:
-        print("Некорректный номер. Конфиг не изменён.")
+
+    def parse_choice(s: str) -> int | None:
+        if not s:
+            return None
+        try:
+            n = int(s)
+            if 1 <= n <= len(free):
+                return n
+        except ValueError:
+            pass
+        return None
+
+    nr = parse_choice(choice_record)
+    ns = parse_choice(choice_stop)
+    if choice_record and nr is None:
+        print("Некорректный номер для записи. Конфиг не изменён.")
         return 1
-    if n < 1 or n > len(free):
-        print("Номер вне диапазона. Конфиг не изменён.")
+    if choice_stop and ns is None:
+        print("Некорректный номер для стопа. Конфиг не изменён.")
         return 1
 
-    new_hotkey = free[n - 1]
-    cfg["hotkey"] = new_hotkey
+    if nr is not None:
+        cfg["hotkey_record"] = free[nr - 1]
+    if ns is not None:
+        cfg["hotkey_stop"] = free[ns - 1]
     save_config(cfg)
-    print(f'Готово. В config.yaml записано: hotkey: "{new_hotkey}"')
-    print("Теперь выберите пункт 6 в меню, чтобы запустить программу с новой горячей клавишей.")
+    print(f'Готово. В config.yaml: hotkey_record: "{cfg["hotkey_record"]}", hotkey_stop: "{cfg["hotkey_stop"]}"')
+    print("Запустите программу (пункт 3), чтобы применить.")
     return 0
 
 

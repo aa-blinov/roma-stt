@@ -100,55 +100,62 @@ echo   Это меню. Введите цифру и нажмите Enter.
 echo   Для пункта 0 ^(установка программ^) запустите батник от имени администратора:
 echo   правый щелчок по roma-stt.bat - "Запуск от имени администратора".
 echo.
-echo   --- Первый запуск: 0, затем 1, 2, 5 ---
+echo   --- Первый запуск: 0, 1, 2, затем 3 ^(Запуск^) ---
 echo.
 echo   0. Установить нужные программы
 echo      Один раз: uv, Git, CMake, Visual Studio Build Tools. Нужно для пункта 1.
 echo      Запустите батник от имени администратора. Если всё уже стоит — переходите к 1.
 echo.
 echo   1. Установка
-echo      Один раз: ставит всё нужное, скачивает модель, собирает программу распознавания.
-echo      Сначала выполните пункт 0, если ещё не ставили программы.
+echo      Один раз: среда, модель, сборка whisper. Сначала пункт 0, если ещё не ставили программы.
 echo.
 echo   2. Проверка готовности
-echo      Проверить, что всё установлено и готово к работе. Запускайте после пункта 1.
+echo      Убедиться, что всё установлено. Запускайте после пункта 1.
 echo.
-echo   3. Удалить установку
-echo      Удалить .venv и папку models (полная очистка, потом снова пункт 1).
-echo.
-echo   4. Модели распознавания
-echo      Список моделей, скачать другую, выбрать активную (подменю 1–4).
-echo.
-echo   5. Запустить программу (в трее)
+echo   3. Запустить службу (в трее)
 echo      При запуске: 1=cpu, 2=cuda, 3=amd. Горячая клавиша из config.yaml.
 echo.
-echo   6. Остановить программу
+echo   4. Остановить службу
 echo      Завершить работу Roma-STT в трее.
 echo.
-echo   7. Подбор свободной горячей клавиши
-echo      Протестировать варианты с F-клавишами и записать выбранный в config.yaml.
+echo   5. Модели распознавания
+echo      Список моделей, ввод номера/названия — выбрать или скачать и выбрать.
 echo.
-echo   8. Указать горячую клавишу вручную
-echo      Ввести строку (например Ctrl+F12) и записать в config.yaml.
+echo   6. Подбор свободной горячей клавиши
+echo      Протестировать F-клавиши и записать выбранные в config.yaml.
+echo.
+echo   7. Горячая клавиша записи
+echo      Ввести строку для записи (например Ctrl+F2).
+echo.
+echo   8. Горячая клавиша стопа
+echo      Ввести строку для стопа (например Ctrl+F3).
 echo.
 echo   9. Выбрать язык (ru/en/...)
 echo.
-echo  10. Выход
+echo  10. Устройство ввода ^(микрофон^)
+echo      Сканировать микрофоны Windows и выбрать номер для записи.
 echo.
-set /p choice="Введите цифру (0-10): "
-
+echo  11. Удалить установку
+echo      Удалить .venv и models (полная очистка, потом снова пункт 1).
+echo.
+echo  12. Выход
+echo.
+set /p choice="Введите цифру (0-12, Enter — обновить меню): "
+if "!choice!"=="" goto menu
 if "%choice%"=="0" goto install_tools
 if "%choice%"=="1" goto install
 if "%choice%"=="2" goto check
-if "%choice%"=="3" goto remove
-if "%choice%"=="4" goto models
-if "%choice%"=="5" goto start
-if "%choice%"=="6" goto stop
-if "%choice%"=="7" goto scan_hotkeys
-if "%choice%"=="8" goto set_hotkey_manual
+if "%choice%"=="3" goto start
+if "%choice%"=="4" goto stop
+if "%choice%"=="5" goto models
+if "%choice%"=="6" goto scan_hotkeys
+if "%choice%"=="7" goto set_hotkey_record
+if "%choice%"=="8" goto set_hotkey_stop
 if "%choice%"=="9" goto set_language
-if "%choice%"=="10" exit /b 0
-echo Неизвестный выбор. Введите цифру от 0 до 10.
+if "%choice%"=="10" goto set_input_device
+if "%choice%"=="11" goto remove
+if "%choice%"=="12" exit /b 0
+echo Неизвестный выбор. Введите цифру от 0 до 12.
 goto menu
 
 :install_tools
@@ -169,15 +176,16 @@ if errorlevel 1 (
     goto menu
 )
 echo   1 = cpu  2 = cuda  3 = amd
-set /p arch="Архитектура (1/2/3 или Enter для cpu): "
+set /p arch="Архитектура (1/2/3, Enter — в главное меню): "
+if "!arch!"=="" goto menu
 set a=cpu
-if "%arch%"=="2" set a=cuda
-if "%arch%"=="3" set a=amd
+if "!arch!"=="2" set a=cuda
+if "!arch!"=="3" set a=amd
 echo.
 echo Запуск установки (среда, зависимости, сборка whisper [%a%], модель)...
 uv run python scripts\install.py --arch %a%
 echo.
-echo Готово. Дальше: пункт 2 (Проверка), затем пункт 5 (Запуск).
+echo Готово. Дальше: пункт 2 (Проверка), затем пункт 3 (Запуск).
 pause
 goto menu
 
@@ -193,14 +201,15 @@ pause
 goto menu
 
 :remove
-echo [3] Удаление установки
+echo [11] Удаление установки
 if not exist .venv (
     echo Удалять нечего — установка ещё не выполнялась. Сначала сделайте 1 ^(Установка^).
     pause
     goto menu
 )
 echo Имеет смысл только если хотите всё удалить и поставить заново. После удаления снова выполните 1.
-set /p confirm="Удалить .venv и models? (y/N): "
+set /p confirm="Удалить .venv и models? (y/N, Enter — в главное меню): "
+if "!confirm!"=="" goto menu
 if /i not "!confirm!"=="y" goto menu
 if exist .venv rmdir /s /q .venv
 if exist models rmdir /s /q models
@@ -210,51 +219,46 @@ goto menu
 
 :models
 echo.
-echo [4] Модели распознавания
+echo [5] Модели распознавания
 if not exist .venv (
-    echo Сначала выполните 1 ^(Установка^) — тогда появится среда и модель по умолчанию. После этого здесь можно скачать другие модели.
+    echo Сначала выполните 1 ^(Установка^) — тогда появится среда и модель по умолчанию.
     pause
     goto menu
 )
-echo   1 = список доступных моделей ^(с номерами для скачивания^)
-echo   2 = список уже скачанных
-echo   3 = выбрать активную модель
-echo   4 = скачать модель ^(номер из списка 1 или название: base, small...^)
-set /p m="Введите цифру (1-4): "
-if "!m!"=="1" ( uv run python scripts\models.py list-available )
-if "!m!"=="2" ( uv run python scripts\models.py list-downloaded )
-if "!m!"=="3" (
-    set /p name="Имя файла модели: "
-    uv run python scripts\models.py set "!name!"
-)
-if "!m!"=="4" (
-    echo Введите номер модели из списка 1 ^(1-8^) или название ^(например base^):
-    set /p name="Номер или название: "
-    uv run python scripts\download_model.py "!name!"
-)
-if not "!m!"=="1" if not "!m!"=="2" if not "!m!"=="3" if not "!m!"=="4" (
-    echo Неизвестный ввод. Введите цифру от 1 до 4.
-)
+uv run python scripts\models.py list-all
+set /p num="Номер (1-8) или название (Enter — в главное меню): "
+if "!num!"=="" goto menu
+uv run python scripts\models.py use "!num!"
 pause
 goto menu
 
 :scan_hotkeys
-echo [7] Подбор свободной горячей клавиши...
+echo [6] Подбор свободной горячей клавиши...
 echo Тестируются сочетания Ctrl/Shift/Alt с F-клавишами (F1–F24).
 echo Можно выбрать найденный вариант, и он будет записан в config.yaml.
 uv run python scripts\scan_hotkeys.py
 pause
 goto menu
 
-:set_hotkey_manual
-echo [8] Указать горячую клавишу вручную...
-echo Примеры: Ctrl+F9, Ctrl+Shift+F12, Ctrl+Alt+F10.
-set /p newhk="Введите строку для hotkey (или Enter, чтобы отменить): "
-if "%newhk%"=="" goto menu
-echo.
-echo Записываем в config.yaml: hotkey: "%newhk%"
-uv run python -c "from infrastructure.config_repo import load_config, save_config; from pathlib import Path; import sys; p=Path('config.yaml'); cfg=load_config(p); cfg['hotkey']=sys.argv[1]; save_config(p,cfg)" "%newhk%"
-echo Готово. Теперь можно запустить пункт 5 (Запуск программы).
+:set_hotkey_record
+echo [7] Горячая клавиша записи...
+echo Примеры: Ctrl+F2, Ctrl+Shift+F12. Enter = Ctrl+F2.
+set /p newrec="Введите строку (Enter = Ctrl+F2): "
+if "!newrec!"=="" set "newrec=Ctrl+F2"
+echo Записываем в config.yaml: hotkey_record: !newrec!
+uv run python -c "from infrastructure.config_repo import load_config, save_config; from pathlib import Path; import sys; p=Path('config.yaml'); cfg=load_config(p); cfg['hotkey_record']=sys.argv[1]; save_config(p,cfg)" "!newrec!"
+echo Готово.
+pause
+goto menu
+
+:set_hotkey_stop
+echo [8] Горячая клавиша стопа...
+echo Примеры: Ctrl+F3, Ctrl+Shift+F12. Enter = Ctrl+F3.
+set /p newstop="Введите строку (Enter = Ctrl+F3): "
+if "!newstop!"=="" set "newstop=Ctrl+F3"
+echo Записываем в config.yaml: hotkey_stop: !newstop!
+uv run python -c "from infrastructure.config_repo import load_config, save_config; from pathlib import Path; import sys; p=Path('config.yaml'); cfg=load_config(p); cfg['hotkey_stop']=sys.argv[1]; save_config(p,cfg)" "!newstop!"
+echo Готово.
 pause
 goto menu
 
@@ -264,8 +268,8 @@ echo Текущий язык:
 uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print(cfg.get('language', 'ru'))"
 echo.
 echo Примеры: ru, en, de, fr, es, it, jp, zh.
-set /p newlang="Введите код языка (или Enter, чтобы оставить как есть): "
-if "%newlang%"=="" goto menu
+set /p newlang="Введите код языка (Enter — в главное меню): "
+if "!newlang!"=="" goto menu
 echo.
 echo Записываем в config.yaml: language: "%newlang%"
 uv run python -c "from infrastructure.config_repo import load_config, save_config; from pathlib import Path; import sys; p=Path('config.yaml'); cfg=load_config(p); cfg['language']=sys.argv[1]; save_config(p,cfg)" "%newlang%"
@@ -273,36 +277,52 @@ echo Готово.
 pause
 goto menu
 
-:start
-echo [5] Запуск программы...
+:set_input_device
+echo [10] Устройство ввода (микрофон)...
 if not exist .venv (
-    echo Сначала выполните 1 ^(Установка^), затем 2 ^(Проверка^). Когда в пункте 2 всё будет OK — снова выберите 5.
+    echo Сначала выполните 1 ^(Установка^).
+    pause
+    goto menu
+)
+uv run python scripts\list_audio_devices.py
+set /p devnum="Номер устройства (Enter — в главное меню): "
+if "!devnum!"=="" goto menu
+uv run python scripts\list_audio_devices.py --set !devnum!
+pause
+goto menu
+
+:start
+echo [3] Запуск службы...
+if not exist .venv (
+    echo Сначала выполните 1 ^(Установка^), затем 2 ^(Проверка^). Когда в пункте 2 всё будет OK — снова выберите 3.
     pause
     goto menu
 )
 uv run python scripts\check_ready.py >nul 2>&1
 if errorlevel 1 (
-    echo Проверка готовности не прошла. Сделайте по порядку: 1 ^(Установка^), потом 2 ^(Проверка^). Когда в пункте 2 будет «Ready» — снова выберите 5.
+    echo Проверка готовности не прошла. Сделайте по порядку: 1 ^(Установка^), потом 2 ^(Проверка^). Когда в пункте 2 будет «Ready» — снова выберите 3.
     pause
     goto menu
 )
 for /f "usebackq tokens=*" %%i in (`uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print(cfg.get('module', 'cpu'))"`) do set "current_mod=%%i"
 echo   1 = cpu  2 = cuda  3 = amd
-set /p mod="Режим (1/2/3 или Enter для !current_mod!): "
-if "!mod!"=="" set mod=!current_mod!
+set /p mod="Режим (1/2/3, Enter — в главное меню): "
+if "!mod!"=="" goto menu
 if "!mod!"=="1" set mod=cpu
 if "!mod!"=="2" set mod=cuda
 if "!mod!"=="3" set mod=amd
 set "cfgfile=config.yaml"
 uv run python -c "from infrastructure.config_repo import load_config, save_config; from pathlib import Path; import sys; p=Path('!cfgfile!'); cfg=load_config(p); cfg['module']=sys.argv[1]; save_config(p,cfg)" "!mod!"
-echo Программа запускается в трее. Горячая клавиша — из config.yaml (запись — стоп — вставка текста).
-echo Остановить: пункт 6 или закройте это окно.
+for /f "usebackq tokens=*" %%a in (`uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print(cfg.get('hotkey_record', 'Ctrl+F2'))"`) do set "hk_r=%%a"
+for /f "usebackq tokens=*" %%b in (`uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print(cfg.get('hotkey_stop', 'Ctrl+F3'))"`) do set "hk_s=%%b"
+echo Служба запускается в трее. Запись: !hk_r!, Стоп: !hk_s!
+echo Остановить: пункт 4 или закройте это окно.
 start /B "Roma-STT" uv run python main.py --module !mod!
 pause
 goto menu
 
 :stop
-echo [6] Остановка Roma-STT...
+echo [4] Остановка Roma-STT...
 if exist .roma-stt.pid (
     for /f "usebackq delims=" %%i in (".roma-stt.pid") do taskkill /PID %%i /F >nul 2>nul
     del .roma-stt.pid 2>nul
@@ -311,6 +331,6 @@ if exist .roma-stt.pid (
     taskkill /FI "WINDOWTITLE eq Roma-STT*" /F >nul 2>nul
 )
 echo Готово.
-echo Если программа не была запущена — ничего страшного. Чтобы начать: сначала 1 ^(Установка^), потом 2 ^(Проверка^), потом 5 ^(Запуск^).
+echo Если служба не была запущена — ничего страшного. Чтобы начать: сначала 1 ^(Установка^), потом 2 ^(Проверка^), потом 3 ^(Запуск^).
 pause
 goto menu

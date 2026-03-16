@@ -12,6 +12,7 @@ venv/
 # Roma-STT Specific
 models/
 bin/
+logs/
 *.wav
 *.pid
 .roma-stt.pid

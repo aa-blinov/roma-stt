@@ -18,12 +18,12 @@ def run(cmd: list[str], cwd: Path | None = None) -> bool:
 
 
 def download_default_model() -> bool:
-    """Download small multilingual model (base) if models/ is empty."""
+    """Download recommended multilingual model (large-v3-turbo) if models/ is empty."""
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     if list(MODELS_DIR.glob("*.bin")) or list(MODELS_DIR.glob("*.ggml")):
         return True
-    print("Downloading default model (base, multilingual)...")
-    r = subprocess.run([sys.executable, str(ROOT / "scripts" / "download_model.py"), "base"], cwd=ROOT)
+    print("Downloading default model (large-v3-turbo, multilingual)...")
+    r = subprocess.run([sys.executable, str(ROOT / "scripts" / "download_model.py"), "large-v3-turbo"], cwd=ROOT)
     if r.returncode != 0:
         return False
     # Set in config if missing
@@ -33,11 +33,11 @@ def download_default_model() -> bool:
 
         data = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
         if not data.get("whisper_model_path"):
-            base_path = MODELS_DIR / "ggml-base.bin"
-            if base_path.exists():
-                data["whisper_model_path"] = str(base_path.resolve())
+            model_path = MODELS_DIR / "ggml-large-v3-turbo.bin"
+            if model_path.exists():
+                data["whisper_model_path"] = str(model_path.resolve())
                 config_path.write_text(yaml.dump(data, allow_unicode=True, default_flow_style=False), encoding="utf-8")
-                print("Set whisper_model_path in config.yaml to ggml-base.bin")
+                print("Set whisper_model_path in config.yaml to ggml-large-v3-turbo.bin")
     return True
 
 
@@ -84,9 +84,9 @@ def main() -> int:
     if not args.no_download:
         if build_ok:
             if not download_default_model():
-                print("Загрузка модели не удалась. Позже: пункт 4 -> скачать модель.")
+                print("Загрузка модели не удалась. Позже: пункт 5 -> модели.")
         else:
-            print("Сборка не удалась — модель не качаем. После успешной сборки: пункт 4 -> скачать модель.")
+            print("Сборка не удалась — модель не качаем. После успешной сборки: пункт 5 -> модели.")
     if not args.no_build_check:
         check_build()
     print("Install done. Run Check readiness (menu 2) or Start (menu 6).")

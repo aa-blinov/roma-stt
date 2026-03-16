@@ -7,12 +7,14 @@ import yaml
 
 DEFAULT_CONFIG: dict[str, Any] = {
     "module": "cpu",
-    "hotkey": "Ctrl+F9",
+    "hotkey_record": "Ctrl+F2",  # запись
+    "hotkey_stop": "Ctrl+F3",  # стоп
     "whisper_cpp_path_cpu": "",
     "whisper_cpp_path_cuda": "",
     "whisper_cpp_path_amd": "",
     "whisper_model_path": "",
     "language": "ru",
+    "input_device": None,  # None = системный микрофон по умолчанию, иначе индекс устройства
 }
 
 
@@ -25,6 +27,8 @@ def load_config(config_path: str | Path) -> dict[str, Any]:
     data = yaml.safe_load(text) or {}
     out = dict(DEFAULT_CONFIG)
     out.update(data)
+    # Устаревший ключ — не используем и не сохраняем
+    out.pop("hotkey", None)
     return out
 
 
