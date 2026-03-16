@@ -1,10 +1,19 @@
-"""Check readiness: uv, .venv, exe, models, config. For roma-stt.bat."""
+"""Check readiness: uv, .venv, exe, models, config, optional CUDA. For roma-stt.bat."""
 
+import shutil
 import sys
 from pathlib import Path
 
 # Project root
 ROOT = Path(__file__).resolve().parent.parent
+
+
+def check_nvcc() -> tuple[bool, str]:
+    """Whether nvcc (CUDA Toolkit) is in PATH — needed to build/use cuda."""
+    nvcc = shutil.which("nvcc")
+    if nvcc:
+        return True, "nvcc (CUDA): in PATH"
+    return False, "nvcc (CUDA): not in PATH (install CUDA Toolkit for cuda build)"
 
 
 def check_uv() -> tuple[bool, str]:
@@ -91,10 +100,24 @@ def main() -> int:
         print(f"  [{status}] {msg}")
         if not ok:
             all_ok = False
+    # Всегда показывать модуль из конфига и статус CUDA (nvcc)
+    try:
+        import yaml
+        config_path = ROOT / "config.yaml"
+        module = "cpu"
+        if config_path.exists():
+            data = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+            module = data.get("module", "cpu")
+        print(f"  [--] module: {module}")
+        nvcc_ok, nvcc_msg = check_nvcc()
+        status = "OK" if nvcc_ok else "WARN"
+        print(f"  [{status}] {nvcc_msg}")
+    except Exception:
+        pass
     if all_ok:
         print("Ready. You can start the service from the bat menu.")
     else:
-        print("Not ready. Use bat menu: 1=Install, 5=Models.")
+        print("Not ready. Use bat menu: 1=Install, 4=Models.")
     return 0 if all_ok else 1
 
 

@@ -1,6 +1,7 @@
 """Install: uv venv, uv sync, optionally download model and check whisper build. For roma-stt.bat."""
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -11,7 +12,8 @@ MODELS_DIR = ROOT / "models"
 
 def run(cmd: list[str], cwd: Path | None = None) -> bool:
     cwd = cwd or ROOT
-    r = subprocess.run(cmd, cwd=cwd, shell=False)
+    cwd = Path(cwd).resolve()
+    r = subprocess.run(cmd, cwd=str(cwd), shell=False)
     return r.returncode == 0
 
 
@@ -53,6 +55,7 @@ def check_build() -> None:
 
 
 def main() -> int:
+    os.chdir(ROOT)
     parser = argparse.ArgumentParser()
     parser.add_argument("--arch", choices=["cpu", "cuda", "amd"], default="cpu", help="Target architecture")
     parser.add_argument("--no-download", action="store_true", help="Skip downloading default model")
@@ -73,11 +76,17 @@ def main() -> int:
     if not run(["uv", "sync"]):
         print("Failed to uv sync")
         return 1
+    build_ok = True
     if not args.no_whisper_build:
-        if not build_whisper_cpp(args.arch):
+        build_ok = build_whisper_cpp(args.arch)
+        if not build_ok:
             print("whisper.cpp build failed. You can retry later: roma-stt.bat build-whisper")
-    if not args.no_download and not download_default_model():
-        print("Model download failed. You can download later via bat menu 5 -> download.")
+    if not args.no_download:
+        if build_ok:
+            if not download_default_model():
+                print("Загрузка модели не удалась. Позже: пункт 4 -> скачать модель.")
+        else:
+            print("Сборка не удалась — модель не качаем. После успешной сборки: пункт 4 -> скачать модель.")
     if not args.no_build_check:
         check_build()
     print("Install done. Run Check readiness (menu 2) or Start (menu 6).")

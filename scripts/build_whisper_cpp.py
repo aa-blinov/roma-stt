@@ -67,7 +67,15 @@ def build(arch: str = "cpu") -> tuple[bool, str]:
 
     ok, out = run(cmake_args, cwd=WHISPER_DIR, capture=True)
     if not ok:
-        return False, f"cmake configure failed: {out}"
+        hint = ""
+        if arch == "cuda" and ("nvcc" in out or "CUDA Toolkit" in out or "CUDAToolkit" in out):
+            hint = (
+                "\n\nДля CUDA нужен NVIDIA CUDA Toolkit. "
+                "Установить через батник: пункт 0 (Установка программ), затем ответить «y» на вопрос про CUDA. "
+                "Или вручную: winget install -e --id Nvidia.CUDA или https://developer.nvidia.com/cuda-downloads\n"
+                "После установки перезапустите консоль. Если cmake не находит nvcc, задайте: set CUDAToolkit_ROOT=C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.x"
+            )
+        return False, f"cmake configure failed: {out}{hint}"
 
     print(f"Building whisper.cpp (Release) for {arch}...")
     ok, out = run(

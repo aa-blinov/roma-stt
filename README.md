@@ -72,8 +72,8 @@ Repair-WinGetPackageManager -AllUsers
 
 При установке (пункт **1**) или пересборке (`build-whisper`) программа спрашивает тип видеокарты.  
 
-- **CUDA** (NVIDIA): требуется установленный CUDA Toolkit.
-- **AMD** (Vulkan): требуется Vulkan SDK.
+- **CUDA** (NVIDIA): требуется [NVIDIA CUDA Toolkit](https://developer.nvidia.com/cuda-downloads). Можно поставить через батник: пункт **0** (Установка программ) → на вопрос «Установить CUDA?» ответить **y**, либо вручную: `winget install -e --id Nvidia.CUDA`. После сборки, если cmake не находит nvcc, задайте `CUDAToolkit_ROOT` (путь к папке CUDA, например `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.x`).
+- **AMD** (Vulkan): требуется Vulkan SDK.  
 Движок автоматически задействует GPU (параметр `-ngl 99`), если выбрана соответствующая архитектура.
 
 ## Использование

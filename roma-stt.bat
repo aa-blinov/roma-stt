@@ -293,6 +293,8 @@ if "!mod!"=="" set mod=!current_mod!
 if "!mod!"=="1" set mod=cpu
 if "!mod!"=="2" set mod=cuda
 if "!mod!"=="3" set mod=amd
+set "cfgfile=config.yaml"
+uv run python -c "from infrastructure.config_repo import load_config, save_config; from pathlib import Path; import sys; p=Path('!cfgfile!'); cfg=load_config(p); cfg['module']=sys.argv[1]; save_config(p,cfg)" "!mod!"
 echo Программа запускается в трее. Горячая клавиша — из config.yaml (запись — стоп — вставка текста).
 echo Остановить: пункт 6 или закройте это окно.
 start /B "Roma-STT" uv run python main.py --module !mod!
