@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+.env
+.pytest_cache/
+.ruff_cache/
+
+# Roma-STT Specific
+models/
+bin/
+*.wav
+*.pid
+.roma-stt.pid
+recorded_audio.wav
+config.yaml
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# whisper.cpp (if not using submodules)
+# whisper.cpp/
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Whisper
+/whisper.cpp
