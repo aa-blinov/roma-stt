@@ -71,8 +71,12 @@ def _find_vcvarsall() -> Path | None:
                 vc = Path(install_path) / "VC" / "Auxiliary" / "Build" / "vcvarsall.bat"
                 if vc.exists():
                     return vc
+                # vswhere found an install but vcvarsall.bat missing — store for diagnostic
+                _find_vcvarsall._vswhere_path = install_path  # type: ignore[attr-defined]
         except Exception:
             pass
+    else:
+        _find_vcvarsall._vswhere_path = "<vswhere.exe not found>"  # type: ignore[attr-defined]
 
     # 2. Fallback: scan well-known install locations
     for base in [
@@ -216,17 +220,31 @@ def build(arch: str = "cpu") -> tuple[bool, str]:
                 if ok:
                     via_vcvarsall = True
             else:
-                print("  [build] Strategy C: vcvarsall.bat NOT found — searching paths:")
+                print("  [build] Strategy C: vcvarsall.bat NOT found — diagnostic:")
+                vswhere_path = getattr(_find_vcvarsall, "_vswhere_path", "<not set>")
+                print(f"    vswhere installationPath: {vswhere_path!r}")
                 for base_p in [
                     Path("C:/Program Files (x86)/Microsoft Visual Studio"),
                     Path("C:/Program Files/Microsoft Visual Studio"),
                 ]:
                     print(f"    {base_p} exists={base_p.exists()}")
                     if base_p.exists():
-                        for year in ["2022", "2019", "2017"]:
-                            for edition in ["BuildTools", "Enterprise", "Professional", "Community"]:
-                                vc = base_p / year / edition / "VC" / "Auxiliary" / "Build" / "vcvarsall.bat"
-                                print(f"      {vc} exists={vc.exists()}")
+                        try:
+                            top = sorted(p.name for p in base_p.iterdir() if p.is_dir())
+                            print(f"      subdirs: {top}")
+                            for sub in base_p.iterdir():
+                                if sub.is_dir():
+                                    try:
+                                        children = sorted(p.name for p in sub.iterdir() if p.is_dir())
+                                        print(f"      {sub.name}/: {children}")
+                                        for child in sub.iterdir():
+                                            if child.is_dir():
+                                                vc = child / "VC" / "Auxiliary" / "Build" / "vcvarsall.bat"
+                                                print(f"        {child.name}/VC/Auxiliary/Build/vcvarsall.bat exists={vc.exists()}")
+                                    except Exception:
+                                        pass
+                        except Exception as e:
+                            print(f"      cannot list: {e}")
 
         if not ok:
             # D: plain run — last resort
