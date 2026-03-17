@@ -3,6 +3,15 @@ chcp 65001 >nul
 setlocal EnableDelayedExpansion
 cd /d "%~dp0"
 
+rem ANSI colors (Windows 10+)
+for /f %%a in ('echo prompt $E^| cmd /q /c prompt $E') do set "ESC=%%a"
+set "C0=!ESC![0m"
+set "CY=!ESC![96m"
+set "CG=!ESC![92m"
+set "CR=!ESC![91m"
+set "CW=!ESC![93m"
+set "CD=!ESC![90m"
+
 if not "%~1"=="" goto run_cmd
 goto menu
 
@@ -20,14 +29,14 @@ if /i "%cmd%"=="build-whisper" goto do_build_whisper
 if /i "%cmd%"=="install-tools" goto do_install_tools
 if /i "%cmd%"=="start" goto do_start
 if /i "%cmd%"=="stop" goto do_stop
-echo Неизвестная команда: %cmd%
-echo Доступные команды: install-tools, install, check, download ^<имя^>, build-whisper, build-check, setup, test-model, start [cpu^|cuda^|amd], stop, toggle-notifications
+echo !CR!Неизвестная команда: %cmd%!C0!
+echo Доступные команды: install-tools, install, check, download ^<имя^>, build-whisper, build-check, setup, test-model, start [cpu^|cuda^|amd], stop
 exit /b 1
 
 :do_install
 uv --version >nul 2>&1
 if errorlevel 1 (
-    echo uv not found. Install: winget install astral-sh.uv
+    echo !CR!uv not found. Install: winget install astral-sh.uv!C0!
     exit /b 1
 )
 uv run python scripts\install.py %2 %3 %4 %5
@@ -92,59 +101,46 @@ exit /b %errorlevel%
 
 :menu
 echo.
-echo  ============================================================
-echo   Roma-STT  -  Speech to Text (голос в текст)
-echo  ============================================================
+echo !CD! ============================================================!C0!
+echo  !CY!Roma-STT!C0!  -  Speech to Text ^(голос в текст^)
+echo !CD! ============================================================!C0!
 echo.
-echo   Это меню. Введите цифру и нажмите Enter.
-echo   Для пункта 0 ^(установка программ^) запустите батник от имени администратора:
-echo   правый щелчок по roma-stt.bat - "Запуск от имени администратора".
+echo   Введите цифру и нажмите Enter.
+echo   !CW!Первый запуск: 0 → 1 → 2 → 3!C0!
+echo   Пункт 0 требует запуска от имени администратора.
 echo.
-echo   --- Первый запуск: 0, 1, 2, затем 3 ^(Запуск^) ---
+echo   !CW! 0.!C0! Установить нужные программы
+echo      Один раз: uv, Git, CMake, Visual Studio Build Tools.
 echo.
-echo   0. Установить нужные программы
-echo      Один раз: uv, Git, CMake, Visual Studio Build Tools. Нужно для пункта 1.
-echo      Запустите батник от имени администратора. Если всё уже стоит — переходите к 1.
+echo   !CW! 1.!C0! Установка
+echo      Один раз: среда, модель, сборка whisper.cpp.
 echo.
-echo   1. Установка
-echo      Один раз: среда, модель, сборка whisper. Сначала пункт 0, если ещё не ставили программы.
+echo   !CW! 2.!C0! Проверка готовности
+echo      Убедиться, что всё установлено. После пункта 1.
 echo.
-echo   2. Проверка готовности
-echo      Убедиться, что всё установлено. Запускайте после пункта 1.
-echo.
-echo   3. Запустить службу (в трее)
+echo   !CW! 3.!C0! Запустить службу ^(в трее^)
 echo      Выбор режима: cpu / cuda (NVIDIA) / amd (AMD). Горячая клавиша из config.yaml.
 echo.
-echo   4. Остановить службу
+echo   !CW! 4.!C0! Остановить службу
 echo      Завершить работу Roma-STT в трее.
 echo.
-echo   5. Модели распознавания
-echo      Список моделей, ввод номера/названия — выбрать или скачать и выбрать.
+echo !CD! --- Настройки -----------------------------------------------!C0!
 echo.
-echo   6. Подбор свободной горячей клавиши
-echo      Протестировать F-клавиши и записать выбранные в config.yaml.
+echo   !CW! 5.!C0! Модели распознавания
+echo      Список моделей — выбрать или скачать и выбрать.
 echo.
-echo   7. Горячая клавиша записи
-echo      Ввести строку для записи (например Ctrl+F2).
+echo   !CW! 6.!C0! Подбор свободной горячей клавиши
+echo      Протестировать F-клавиши и записать в config.yaml.
 echo.
-echo   8. Горячая клавиша стопа
-echo      Ввести строку для стопа (например Ctrl+F3).
+echo   !CW! 7.!C0! Горячая клавиша записи
+echo   !CW! 8.!C0! Горячая клавиша стопа
+echo   !CW! 9.!C0! Выбрать язык ^(ru/en/...^)
+echo   !CW!10.!C0! Устройство ввода ^(микрофон^)
+echo   !CW!11.!C0! Удалить установку
+echo   !CW!12.!C0! Уведомления Windows       ^(всплывающие, по умолчанию выключены^)
+echo   !CW!13.!C0! Постобработка текста       ^(заглавная, точка, артефакты, по умолчанию включена^)
 echo.
-echo   9. Выбрать язык (ru/en/...)
-echo.
-echo  10. Устройство ввода ^(микрофон^)
-echo      Сканировать микрофоны Windows и выбрать номер для записи.
-echo.
-echo  11. Удалить установку
-echo      Удалить .venv и models (полная очистка, потом снова пункт 1).
-echo.
-echo  12. Уведомления Windows
-echo      Включить или выключить всплывающие уведомления (по умолчанию выключены).
-echo.
-echo  13. Постобработка текста
-echo      Заглавная буква, точка в конце, удаление артефактов Whisper (по умолчанию включена).
-echo.
-echo  14. Выход
+echo   !CW!14.!C0! Выход
 echo.
 set /p choice="Введите цифру (0-14, Enter — обновить меню): "
 if "!choice!"=="" goto menu
@@ -163,22 +159,22 @@ if "%choice%"=="11" goto remove
 if "%choice%"=="12" goto toggle_notifications
 if "%choice%"=="13" goto toggle_postprocess
 if "%choice%"=="14" exit /b 0
-echo Неизвестный выбор. Введите цифру от 0 до 14.
+echo !CR!Неизвестный выбор. Введите цифру от 0 до 14.!C0!
 goto menu
 
 :install_tools
-echo [0] Установка нужных программ (uv, Git, CMake, VS Build Tools)...
+echo !CY![0]!C0! Установка нужных программ (uv, Git, CMake, VS Build Tools)...
 echo Если установка не начинается — запустите батник от имени администратора.
 call scripts\install_tools.bat
 pause
 goto menu
 
 :install
-echo [1] Установка...
+echo !CY![1]!C0! Установка...
 echo Проверка uv...
 uv --version >nul 2>&1
 if errorlevel 1 (
-    echo uv не найден. Установите один раз: winget install astral-sh.uv
+    echo !CR!uv не найден. Установите один раз: winget install astral-sh.uv!C0!
     echo Или: powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 ^| iex"
     pause
     goto menu
@@ -186,12 +182,12 @@ if errorlevel 1 (
 call :detect_gpu
 set "arch="
 if "!gpu_nvidia!"=="0" if "!gpu_amd!"=="0" (
-    echo   Дискретная видеокарта не обнаружена — будет установлен CPU-режим.
+    echo   !CD!Дискретная видеокарта не обнаружена — будет установлен CPU-режим.!C0!
     set arch=1
 ) else (
-    echo   1 = cpu  ^(без GPU, всегда работает^)
-    if "!gpu_nvidia!"=="1" echo   2 = cuda ^(!gpu_nvidia_name!^)
-    if "!gpu_amd!"=="1"    echo   3 = amd  ^(!gpu_amd_name!^)
+    echo   !CW!1!C0! = cpu  ^(без GPU, всегда работает^)
+    if "!gpu_nvidia!"=="1" echo   !CW!2!C0! = cuda ^(!gpu_nvidia_name!^)
+    if "!gpu_amd!"=="1"    echo   !CW!3!C0! = amd  ^(!gpu_amd_name!^)
     set "arch_hint=1"
     if "!gpu_nvidia!"=="1" set "arch_hint=!arch_hint!/2"
     if "!gpu_amd!"=="1"    set "arch_hint=!arch_hint!/3"
@@ -203,13 +199,13 @@ if "!arch!"=="2" set a=cuda
 if "!arch!"=="3" set a=amd
 if "!arch!"=="2" if "!gpu_nvidia!"=="0" (
     echo.
-    echo  Выбран CUDA, но видеокарта NVIDIA не обнаружена.
+    echo !CR! Выбран CUDA, но видеокарта NVIDIA не обнаружена.!C0!
     pause
     goto install
 )
 if "!arch!"=="3" if "!gpu_amd!"=="0" (
     echo.
-    echo  Выбран AMD, но видеокарта AMD/Radeon не обнаружена.
+    echo !CR! Выбран AMD, но видеокарта AMD/Radeon не обнаружена.!C0!
     pause
     goto install
 )
@@ -217,47 +213,47 @@ echo.
 echo Запуск установки (среда, зависимости, сборка whisper [%a%], модель)...
 uv run python scripts\install.py --arch %a%
 echo.
-echo Готово. Дальше: пункт 2 (Проверка), затем пункт 3 (Запуск).
+echo !CG!Готово. Дальше: пункт 2 (Проверка), затем пункт 3 (Запуск).!C0!
 pause
 goto menu
 
 :check
-echo [2] Проверка готовности...
+echo !CY![2]!C0! Проверка готовности...
 uv run python scripts\check_ready.py
 pause
 goto menu
 
 :toggle_notifications
-echo [12] Уведомления Windows...
+echo !CY![12]!C0! Уведомления Windows...
 if not exist .venv (
-    echo Сначала выполните 1 ^(Установка^).
+    echo !CR!Сначала выполните 1 (Установка).!C0!
     pause
     goto menu
 )
 for /f "usebackq tokens=*" %%a in (`uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print('включены' if cfg.get('notifications', False) else 'выключены')"`) do set "notif_cur=%%a"
-echo Сейчас уведомления: !notif_cur!
+echo Сейчас уведомления: !CY!!notif_cur!!C0!
 uv run python -c "from infrastructure.config_repo import load_config, save_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); cfg['notifications']=not cfg.get('notifications', False); save_config(p,cfg); print('Уведомления теперь:', 'включены' if cfg['notifications'] else 'выключены')"
 pause
 goto menu
 
 :toggle_postprocess
-echo [13] Постобработка текста...
+echo !CY![13]!C0! Постобработка текста...
 if not exist .venv (
-    echo Сначала выполните 1 ^(Установка^).
+    echo !CR!Сначала выполните 1 (Установка).!C0!
     pause
     goto menu
 )
 for /f "usebackq tokens=*" %%a in (`uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print('включена' if cfg.get('postprocess', True) else 'выключена')"`) do set "pp_cur=%%a"
-echo Сейчас постобработка: !pp_cur!
+echo Сейчас постобработка: !CY!!pp_cur!!C0!
 echo Что делает: заглавная буква, точка в конце, удаление [BLANK_AUDIO] и других артефактов Whisper.
 uv run python -c "from infrastructure.config_repo import load_config, save_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); cfg['postprocess']=not cfg.get('postprocess', True); save_config(p,cfg); print('Постобработка теперь:', 'включена' if cfg['postprocess'] else 'выключена')"
 pause
 goto menu
 
 :remove
-echo [11] Удаление установки
+echo !CY![11]!C0! Удаление установки
 if not exist .venv (
-    echo Удалять нечего — установка ещё не выполнялась. Сначала сделайте 1 ^(Установка^).
+    echo !CR!Удалять нечего — установка ещё не выполнялась.!C0! Сначала сделайте 1 (Установка).
     pause
     goto menu
 )
@@ -267,15 +263,15 @@ if "!confirm!"=="" goto menu
 if /i not "!confirm!"=="y" goto menu
 if exist .venv rmdir /s /q .venv
 if exist models rmdir /s /q models
-echo Удалено. Для новой установки снова выберите пункт 1.
+echo !CG!Удалено. Для новой установки снова выберите пункт 1.!C0!
 pause
 goto menu
 
 :models
 echo.
-echo [5] Модели распознавания
+echo !CY![5]!C0! Модели распознавания
 if not exist .venv (
-    echo Сначала выполните 1 ^(Установка^) — тогда появится среда и модель по умолчанию.
+    echo !CR!Сначала выполните 1 (Установка)!C0! — тогда появится среда и модель по умолчанию.
     pause
     goto menu
 )
@@ -287,7 +283,7 @@ pause
 goto menu
 
 :scan_hotkeys
-echo [6] Подбор свободной горячей клавиши...
+echo !CY![6]!C0! Подбор свободной горячей клавиши...
 echo Тестируются сочетания Ctrl/Shift/Alt с F-клавишами (F1–F24).
 echo Можно выбрать найденный вариант, и он будет записан в config.yaml.
 uv run python scripts\scan_hotkeys.py
@@ -295,48 +291,48 @@ pause
 goto menu
 
 :set_hotkey_record
-echo [7] Горячая клавиша записи...
+echo !CY![7]!C0! Горячая клавиша записи...
 for /f "usebackq tokens=*" %%a in (`uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print(cfg.get('hotkey_record','Ctrl+F2'))"`) do set "cur_rec=%%a"
-echo Сейчас: !cur_rec!
+echo Сейчас: !CY!!cur_rec!!C0!
 echo Примеры: Ctrl+F2, Ctrl+Shift+F12. Enter — оставить текущую.
 set /p newrec="Введите строку (Enter — оставить !cur_rec!): "
 if "!newrec!"=="" goto menu
 uv run python -c "from infrastructure.config_repo import load_config, save_config; from pathlib import Path; import sys; p=Path('config.yaml'); cfg=load_config(p); cfg['hotkey_record']=sys.argv[1]; save_config(p,cfg)" "!newrec!"
-echo Готово. Перезапустите службу (пункт 4, затем 3), чтобы изменение вступило в силу.
+echo !CG!Готово.!C0! Перезапустите службу (пункт 4, затем 3), чтобы изменение вступило в силу.
 pause
 goto menu
 
 :set_hotkey_stop
-echo [8] Горячая клавиша стопа...
+echo !CY![8]!C0! Горячая клавиша стопа...
 for /f "usebackq tokens=*" %%a in (`uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print(cfg.get('hotkey_stop','Ctrl+F3'))"`) do set "cur_stop=%%a"
-echo Сейчас: !cur_stop!
+echo Сейчас: !CY!!cur_stop!!C0!
 echo Примеры: Ctrl+F3, Ctrl+Shift+F12. Enter — оставить текущую.
 set /p newstop="Введите строку (Enter — оставить !cur_stop!): "
 if "!newstop!"=="" goto menu
 uv run python -c "from infrastructure.config_repo import load_config, save_config; from pathlib import Path; import sys; p=Path('config.yaml'); cfg=load_config(p); cfg['hotkey_stop']=sys.argv[1]; save_config(p,cfg)" "!newstop!"
-echo Готово. Перезапустите службу (пункт 4, затем 3), чтобы изменение вступило в силу.
+echo !CG!Готово.!C0! Перезапустите службу (пункт 4, затем 3), чтобы изменение вступило в силу.
 pause
 goto menu
 
 :set_language
-echo [9] Выбрать язык...
+echo !CY![9]!C0! Выбрать язык...
 for /f "usebackq tokens=*" %%a in (`uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print(cfg.get('language', 'ru'))"`) do set "cur_lang=%%a"
-echo Текущий язык: !cur_lang!
+echo Текущий язык: !CY!!cur_lang!!C0!
 echo.
 echo Примеры: ru, en, de, fr, es, it, jp, zh.
 set /p newlang="Введите код языка (Enter — в главное меню): "
 if "!newlang!"=="" goto menu
-if "!newlang!"=="russian" ( echo Используйте код "ru", а не "russian". & pause & goto set_language )
-if "!newlang!"=="english" ( echo Используйте код "en", а не "english". & pause & goto set_language )
+if "!newlang!"=="russian" ( echo !CR!Используйте код "ru", а не "russian".!C0! & pause & goto set_language )
+if "!newlang!"=="english" ( echo !CR!Используйте код "en", а не "english".!C0! & pause & goto set_language )
 uv run python -c "from infrastructure.config_repo import load_config, save_config; from pathlib import Path; import sys; p=Path('config.yaml'); cfg=load_config(p); cfg['language']=sys.argv[1]; save_config(p,cfg)" "!newlang!"
-echo Язык установлен: !newlang!
+echo !CG!Язык установлен: !newlang!!C0!
 pause
 goto menu
 
 :set_input_device
-echo [10] Устройство ввода (микрофон)...
+echo !CY![10]!C0! Устройство ввода (микрофон)...
 if not exist .venv (
-    echo Сначала выполните 1 ^(Установка^).
+    echo !CR!Сначала выполните 1 (Установка).!C0!
     pause
     goto menu
 )
@@ -348,26 +344,26 @@ pause
 goto menu
 
 :start
-echo [3] Запуск службы...
+echo !CY![3]!C0! Запуск службы...
 if not exist .venv (
-    echo Сначала выполните 1 ^(Установка^), затем 2 ^(Проверка^). Когда в пункте 2 всё будет OK — снова выберите 3.
+    echo !CR!Сначала выполните 1 (Установка), затем 2 (Проверка). Когда в пункте 2 всё будет OK — снова выберите 3.!C0!
     pause
     goto menu
 )
 if exist .roma-stt.pid (
-    echo Служба уже запущена. Для перезапуска сначала остановите её ^(пункт 4^).
+    echo !CR!Служба уже запущена.!C0! Для перезапуска сначала остановите её ^(пункт 4^).
     pause
     goto menu
 )
 call :detect_gpu
 set "mod="
 if "!gpu_nvidia!"=="0" if "!gpu_amd!"=="0" (
-    echo   Дискретная видеокарта не обнаружена — запускается CPU-режим.
+    echo   !CD!Дискретная видеокарта не обнаружена — запускается CPU-режим.!C0!
     set mod=cpu
 ) else (
-    echo   1 = cpu  ^(без GPU, всегда работает^)
-    if "!gpu_nvidia!"=="1" echo   2 = cuda ^(!gpu_nvidia_name!^)
-    if "!gpu_amd!"=="1"    echo   3 = amd  ^(!gpu_amd_name!^)
+    echo   !CW!1!C0! = cpu  ^(без GPU, всегда работает^)
+    if "!gpu_nvidia!"=="1" echo   !CW!2!C0! = cuda ^(!gpu_nvidia_name!^)
+    if "!gpu_amd!"=="1"    echo   !CW!3!C0! = amd  ^(!gpu_amd_name!^)
     set "mod_hint=1"
     if "!gpu_nvidia!"=="1" set "mod_hint=!mod_hint!/2"
     if "!gpu_amd!"=="1"    set "mod_hint=!mod_hint!/3"
@@ -377,20 +373,20 @@ if "!gpu_nvidia!"=="0" if "!gpu_amd!"=="0" (
     if "!mod!"=="2" set mod=cuda
     if "!mod!"=="3" set mod=amd
     if not "!mod!"=="cpu" if not "!mod!"=="cuda" if not "!mod!"=="amd" (
-        echo Неверный выбор. Введите одну из предложенных цифр.
+        echo !CR!Неверный выбор. Введите одну из предложенных цифр.!C0!
         pause
         goto start
     )
 )
 if "!mod!"=="cuda" if "!gpu_nvidia!"=="0" (
     echo.
-    echo  Выбран CUDA, но видеокарта NVIDIA не обнаружена.
+    echo !CR! Выбран CUDA, но видеокарта NVIDIA не обнаружена.!C0!
     pause
     goto start
 )
 if "!mod!"=="amd" if "!gpu_amd!"=="0" (
     echo.
-    echo  Выбран AMD, но видеокарта AMD/Radeon не обнаружена.
+    echo !CR! Выбран AMD, но видеокарта AMD/Radeon не обнаружена.!C0!
     pause
     goto start
 )
@@ -400,11 +396,11 @@ if not exist "bin\main-!mod!.exe" (
     uv run python scripts\build_whisper_cpp.py --arch !mod!
     if errorlevel 1 (
         echo.
-        echo Сборка завершилась с ошибкой. Проверьте зависимости ^(пункт 0^) и повторите.
+        echo !CR!Сборка завершилась с ошибкой. Проверьте зависимости ^(пункт 0^) и повторите.!C0!
         pause
         goto menu
     )
-    echo Сборка завершена.
+    echo !CG!Сборка завершена.!C0!
     set "cfgfile=config.yaml"
     uv run python -c "from infrastructure.config_repo import load_config, save_config; from pathlib import Path; import sys; p=Path('!cfgfile!'); cfg=load_config(p); cfg['module']=sys.argv[1]; save_config(p,cfg)" "!mod!"
     goto start_now
@@ -413,7 +409,7 @@ set "cfgfile=config.yaml"
 uv run python -c "from infrastructure.config_repo import load_config, save_config; from pathlib import Path; import sys; p=Path('!cfgfile!'); cfg=load_config(p); cfg['module']=sys.argv[1]; save_config(p,cfg)" "!mod!"
 uv run python scripts\check_ready.py >nul 2>&1
 if errorlevel 1 (
-    echo Проверка готовности не прошла:
+    echo !CR!Проверка готовности не прошла:!C0!
     uv run python scripts\check_ready.py
     echo.
     echo Сделайте по порядку: 1 ^(Установка^), потом 2 ^(Проверка^). Когда в пункте 2 будет «Ready» — снова выберите 3.
@@ -423,13 +419,13 @@ if errorlevel 1 (
 :start_now
 for /f "usebackq tokens=*" %%a in (`uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print(cfg.get('hotkey_record', 'Ctrl+F2'))"`) do set "hk_r=%%a"
 for /f "usebackq tokens=*" %%b in (`uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print(cfg.get('hotkey_stop', 'Ctrl+F3'))"`) do set "hk_s=%%b"
-echo Служба запускается в трее. Запись: !hk_r!, Стоп: !hk_s!
+echo !CG!Служба запускается в трее.!C0! Запись: !CY!!hk_r!!C0!, Стоп: !CY!!hk_s!!C0!
 echo Остановить: пункт 4. Это окно можно закрыть.
 start "" /B .venv\Scripts\pythonw.exe main.py --module !mod!
 goto menu
 
 :stop
-echo [4] Остановка Roma-STT...
+echo !CY![4]!C0! Остановка Roma-STT...
 if exist .roma-stt.pid (
     for /f "usebackq delims=" %%i in (".roma-stt.pid") do taskkill /PID %%i /F >nul 2>nul
     del .roma-stt.pid 2>nul
@@ -437,7 +433,7 @@ if exist .roma-stt.pid (
     for /f "delims=" %%i in ('uv run python scripts\find_roma_stt_pids.py 2^>nul') do taskkill /PID %%i /F >nul 2>nul
     taskkill /FI "WINDOWTITLE eq Roma-STT*" /F >nul 2>nul
 )
-echo Готово.
+echo !CG!Готово.!C0!
 pause
 goto menu
 
