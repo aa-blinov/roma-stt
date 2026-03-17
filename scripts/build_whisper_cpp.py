@@ -20,7 +20,7 @@ def _find_vcvarsall() -> Path | None:
         return None
     try:
         r = subprocess.run(
-            [str(_VSWHERE), "-latest", "-property", "installationPath"],
+            [str(_VSWHERE), "-latest", "-products", "*", "-property", "installationPath"],
             capture_output=True, text=True, timeout=15,
         )
         install_path = r.stdout.strip()
