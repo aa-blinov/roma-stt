@@ -272,6 +272,11 @@ goto menu
 
 :scan_hotkeys
 echo !CY![6]!C0! Подбор свободной горячей клавиши...
+if not exist .venv (
+    echo !CR!Сначала выполните 1 (Установка).!C0!
+    pause
+    goto menu
+)
 echo Тестируются сочетания Ctrl/Shift/Alt с F-клавишами (F1–F24).
 echo Можно выбрать найденный вариант, и он будет записан в config.yaml.
 uv run python scripts\scan_hotkeys.py
@@ -280,6 +285,11 @@ goto menu
 
 :set_hotkey_record
 echo !CY![7]!C0! Горячая клавиша записи...
+if not exist .venv (
+    echo !CR!Сначала выполните 1 (Установка).!C0!
+    pause
+    goto menu
+)
 for /f "usebackq tokens=*" %%a in (`uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print(cfg.get('hotkey_record','Ctrl+F2'))"`) do set "cur_rec=%%a"
 echo Сейчас: !CY!!cur_rec!!C0!
 echo Примеры: Ctrl+F2, Ctrl+Shift+F12. Enter — оставить текущую.
@@ -292,6 +302,11 @@ goto menu
 
 :set_hotkey_stop
 echo !CY![8]!C0! Горячая клавиша стопа...
+if not exist .venv (
+    echo !CR!Сначала выполните 1 (Установка).!C0!
+    pause
+    goto menu
+)
 for /f "usebackq tokens=*" %%a in (`uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print(cfg.get('hotkey_stop','Ctrl+F3'))"`) do set "cur_stop=%%a"
 echo Сейчас: !CY!!cur_stop!!C0!
 echo Примеры: Ctrl+F3, Ctrl+Shift+F12. Enter — оставить текущую.
@@ -384,7 +399,7 @@ if not exist "bin\main-!mod!.exe" (
     uv run python scripts\build_whisper_cpp.py --arch !mod!
     if errorlevel 1 (
         echo.
-        echo !CR!Сборка завершилась с ошибкой. Проверьте зависимости ^(пункт 0^) и повторите.!C0!
+        echo !CR!Сборка завершилась с ошибкой. Проверьте зависимости ^(пункт 1^) и повторите.!C0!
         pause
         goto menu
     )
