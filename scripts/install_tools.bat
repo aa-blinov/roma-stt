@@ -68,31 +68,66 @@ if not errorlevel 1 (
     set "vs_installed=1"
     echo Компилятор Visual Studio уже найден в PATH.
 )
+set "vswhere_exe=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
 if not defined vs_installed (
-    set "vswhere=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
-    if exist "!vswhere!" (
-        for /f "usebackq delims=" %%i in (`"!vswhere!" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath 2^>nul`) do set "vs_installed=1"
+    if exist "!vswhere_exe!" (
+        for /f "usebackq delims=" %%i in (`"!vswhere_exe!" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath 2^>nul`) do set "vs_installed=1"
         if defined vs_installed (
-            echo Visual Studio Build Tools уже установлены ^(cl не в PATH — откройте новую консоль или «Developer Command Prompt for VS 2022»^).
+            echo Visual Studio Build Tools уже установлены с компонентом C++.
         )
     )
 )
+
+rem Detect: VS installed but WITHOUT C++ workload
+set "vs_any_path="
 if not defined vs_installed (
-    set /p vs="Установить сейчас? (y/N): "
-    if /i "!vs!"=="y" (
-        echo Устанавливаю Visual Studio Build Tools...
-        winget install --id Microsoft.VisualStudio.2022.BuildTools --override "--wait --passive --add Microsoft.VisualStudio.Workload.VCTools" --accept-package-agreements --accept-source-agreements
-        if errorlevel 1 (
-            echo.
-            echo Сбой установки. Попробуйте:
-            echo 1. Запустить roma-stt.bat от имени администратора и снова выбрать пункт 0.
-            echo 2. Либо открыть «Visual Studio Installer» из меню Пуск - Изменить - отметить «Средства сборки C++».
-            echo 3. Если Build Tools уже стоят, закройте все окна консоли и откройте новую — затем пункт 1.
+    if exist "!vswhere_exe!" (
+        for /f "usebackq delims=" %%i in (`"!vswhere_exe!" -latest -products * -property installationPath 2^>nul`) do set "vs_any_path=%%i"
+    )
+)
+if not defined vs_installed (
+    if defined vs_any_path (
+        echo.
+        echo Visual Studio Build Tools установлен, но компонент C++ ^(vcvarsall.bat^) не найден!
+        echo Нужно добавить рабочую нагрузку «Средства сборки C++».
+        echo.
+        set "vs_installer_exe=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vs_installer.exe"
+        set /p fix_vs="Добавить C++ компонент сейчас? (y — да, Enter — пропустить): "
+        if /i "!fix_vs!"=="y" (
+            if exist "!vs_installer_exe!" (
+                echo Добавляю C++ компонент через Visual Studio Installer...
+                "!vs_installer_exe!" modify --installPath "!vs_any_path!" --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --passive --norestart
+                if not errorlevel 1 (
+                    echo Готово. Закройте консоль, откройте новую и повторите пункт 3.
+                    set "vs_installed=1"
+                ) else (
+                    echo Ошибка установщика. Откройте «Visual Studio Installer» вручную:
+                    echo   Пуск → «Visual Studio Installer» → Изменить → «Средства сборки C++» → Изменить
+                )
+            ) else (
+                echo Запускаю Visual Studio Installer вручную...
+                start "" "%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\setup.exe"
+                echo Нажмите «Изменить» рядом с Build Tools, отметьте «Средства сборки C++», нажмите «Изменить».
+            )
         ) else (
-            echo Может потребоваться перезагрузка. После установки закройте консоль и откройте новую.
+            echo Добавьте вручную: Пуск → «Visual Studio Installer» → Изменить → «Средства сборки C++» → Изменить
         )
     ) else (
-        echo Поставьте потом вручную: https://visualstudio.microsoft.com/visual-cpp-build-tools/
+        set /p vs="Установить Visual Studio Build Tools с C++? (y — да, Enter — пропустить): "
+        if /i "!vs!"=="y" (
+            echo Устанавливаю Visual Studio Build Tools...
+            winget install --id Microsoft.VisualStudio.2022.BuildTools --override "--wait --passive --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended" --accept-package-agreements --accept-source-agreements
+            if errorlevel 1 (
+                echo.
+                echo Сбой установки. Попробуйте:
+                echo 1. Запустить roma-stt.bat от имени администратора и снова выбрать пункт 0.
+                echo 2. Либо открыть «Visual Studio Installer» из меню Пуск → Изменить → «Средства сборки C++».
+            ) else (
+                echo Может потребоваться перезагрузка. После установки закройте консоль и откройте новую.
+            )
+        ) else (
+            echo Поставьте потом вручную: https://visualstudio.microsoft.com/visual-cpp-build-tools/
+        )
     )
 )
 echo.

@@ -154,6 +154,27 @@ def _no_compiler_hint() -> str:
         return ""
     if _find_vcvarsall():
         return ""
+
+    # Check if Build Tools IS installed but without the C++ workload (vcvarsall absent)
+    vswhere_path = getattr(_find_vcvarsall, "_vswhere_path", None)
+    if vswhere_path and not str(vswhere_path).startswith("<"):
+        vs_installer = Path("C:/Program Files (x86)/Microsoft Visual Studio/Installer/vs_installer.exe")
+        cmd = (
+            f'"{vs_installer}" modify'
+            f' --installPath "{vswhere_path}"'
+            " --add Microsoft.VisualStudio.Workload.VCTools"
+            " --includeRecommended --passive --norestart"
+        )
+        return (
+            "\n\nBuild Tools установлен, но компонент C++ (vcvarsall.bat) отсутствует.\n"
+            "Добавьте компонент одним из способов:\n\n"
+            "  1. Через меню Пуск → «Visual Studio Installer»\n"
+            "     → «Изменить» → «Средства сборки C++» → «Изменить»\n\n"
+            "  2. Командой (запустить cmd от имени администратора):\n"
+            f"     {cmd}\n\n"
+            "После установки перезапустите консоль и повторите сборку."
+        )
+
     return (
         "\n\nMSVC-компилятор не найден и Visual Studio Build Tools не обнаружены автоматически.\n"
         "Установите через батник пункт 0 (Установка программ) или вручную:\n"
