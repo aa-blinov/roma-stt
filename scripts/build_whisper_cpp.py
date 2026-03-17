@@ -21,22 +21,25 @@ _VS_GEN_MAP = {
 
 
 def _find_vs_generator() -> str | None:
-    """Detect cmake Visual Studio generator for installed VS or Build Tools.
+    """Detect cmake Visual Studio generator for installed VS IDE (not Build Tools).
 
-    Using the VS generator is more robust than vcvarsall: cmake finds the
-    compiler through the Windows registry without needing a Developer Prompt.
-    Tries with C++ component requirement first, then any install as fallback.
+    The VS generator only works with VS IDE installations, NOT with Build Tools only.
+    Tries with C++ component requirement first, then any VS IDE install.
     """
     if not _VSWHERE.exists():
         return None
     for extra in (
-        ["-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64"],
-        [],  # fallback: any VS/Build Tools installation
+        ["-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+         "-products", "Microsoft.VisualStudio.Product.Enterprise",
+                      "Microsoft.VisualStudio.Product.Professional",
+                      "Microsoft.VisualStudio.Product.Community"],
+        ["-products", "Microsoft.VisualStudio.Product.Enterprise",
+                      "Microsoft.VisualStudio.Product.Professional",
+                      "Microsoft.VisualStudio.Product.Community"],
     ):
         try:
             r = subprocess.run(
-                [str(_VSWHERE), "-latest", "-products", "*",
-                 *extra, "-property", "installationVersion"],
+                [str(_VSWHERE), "-latest", *extra, "-property", "installationVersion"],
                 capture_output=True, text=True, timeout=15,
             )
             version = r.stdout.strip()
@@ -51,7 +54,7 @@ def _find_vs_generator() -> str | None:
 
 
 def _find_vcvarsall() -> Path | None:
-    """Find vcvarsall.bat (fallback for when VS generator is unavailable)."""
+    """Find vcvarsall.bat for VS IDE or Build Tools installation."""
     if not _VSWHERE.exists():
         return None
     try:
@@ -86,21 +89,15 @@ def run(cmd: list[str], cwd: Path, capture: bool = False) -> tuple[bool, str]:
     return r.returncode == 0, ""
 
 
-def run_msvc(cmd: list[str], cwd: Path) -> tuple[bool, str]:
-    """Run cmd with MSVC environment (vcvarsall x64 fallback). Used only when VS generator unavailable."""
-    if _compiler_in_path():
-        return run(cmd, cwd, capture=True)
-
+def _run_vcvarsall(cmd: list[str], cwd: Path) -> tuple[bool, str]:
+    """Run cmd after calling vcvarsall x64 (for Build Tools without VS IDE)."""
     vcvarsall = _find_vcvarsall()
-    if vcvarsall:
-        wrapped = f'call "{vcvarsall}" x64 2>&1 && {subprocess.list2cmdline(cmd)}'
-        r = subprocess.run(
-            ["cmd", "/c", wrapped],
-            cwd=cwd, capture_output=True, text=True, timeout=600,
-        )
-        return r.returncode == 0, (r.stdout or "") + (r.stderr or "")
-
-    return run(cmd, cwd, capture=True)
+    if not vcvarsall:
+        return False, "vcvarsall.bat not found — install Visual Studio Build Tools"
+    wrapped = f'call "{vcvarsall}" x64 2>&1 && {subprocess.list2cmdline(cmd)}'
+    r = subprocess.run(["cmd", "/c", wrapped], cwd=cwd,
+                       capture_output=True, text=True, timeout=600)
+    return r.returncode == 0, (r.stdout or "") + (r.stderr or "")
 
 
 def check_tools() -> tuple[bool, str]:
@@ -133,9 +130,8 @@ def clone_or_pull() -> tuple[bool, str]:
 def _no_compiler_hint() -> str:
     if _compiler_in_path():
         return ""
-    vcvarsall = _find_vcvarsall()
-    if vcvarsall:
-        return ""  # will be set up automatically via run_msvc
+    if _find_vcvarsall():
+        return ""
     return (
         "\n\nMSVC-компилятор не найден и Visual Studio Build Tools не обнаружены автоматически.\n"
         "Установите через батник пункт 0 (Установка программ) или вручную:\n"
@@ -146,31 +142,62 @@ def _no_compiler_hint() -> str:
 
 def build(arch: str = "cpu") -> tuple[bool, str]:
     build_dir = WHISPER_DIR / f"build-{arch}"
-    # Clean stale build dir if previous configure failed (no cmake.check_cache_file = broken cache)
+    # Clean stale build dir if previous configure failed
     if build_dir.exists() and not (build_dir / "CMakeFiles" / "cmake.check_cache_file").exists():
         print(f"Removing stale build cache for {arch}...")
         shutil.rmtree(build_dir, ignore_errors=True)
 
     print(f"Configuring whisper.cpp (cmake) for {arch}...")
-    cmake_args = [
+    base_cmake = [
         "cmake",
         "-B", f"build-{arch}",
         "-DWHISPER_BUILD_EXAMPLES=ON",
         "-DWHISPER_BUILD_TESTS=OFF",
     ]
     if arch == "cuda":
-        cmake_args.append("-DGGML_CUDA=ON")
+        base_cmake.append("-DGGML_CUDA=ON")
     elif arch == "amd":
-        cmake_args.append("-DGGML_VULKAN=ON")
+        base_cmake.append("-DGGML_VULKAN=ON")
 
-    # Prefer VS generator: cmake resolves MSVC from Windows registry — no vcvarsall needed.
-    # Fallback: vcvarsall wrapping or plain run (Developer Command Prompt).
-    vs_gen = _find_vs_generator()
-    if vs_gen:
-        cmake_args += ["-G", vs_gen, "-A", "x64"]
-        ok, out = run(cmake_args, cwd=WHISPER_DIR, capture=True)
+    # Build strategy (tried in order):
+    # A. cl.exe in PATH (Developer Command Prompt) → Ninja, single-config
+    # B. VS IDE installed → VS generator, multi-config (cmake finds via registry)
+    # C. Build Tools only → vcvarsall.bat + Ninja, single-config
+    # D. Plain run (last resort)
+    via_vcvarsall = False
+    multi_config = False
+
+    if _compiler_in_path():
+        # A: already in Developer Prompt — Ninja is fastest
+        ok, out = run(base_cmake + ["-G", "Ninja", "-DCMAKE_BUILD_TYPE=Release"],
+                      cwd=WHISPER_DIR, capture=True)
+        if not ok:
+            ok, out = run(base_cmake, cwd=WHISPER_DIR, capture=True)
+            multi_config = ok
     else:
-        ok, out = run_msvc(cmake_args, cwd=WHISPER_DIR)
+        ok, out = False, ""
+        vs_gen = _find_vs_generator()
+        if vs_gen:
+            # B: VS IDE — multi-config generator, no vcvarsall needed
+            ok, out = run(base_cmake + ["-G", vs_gen, "-A", "x64"],
+                          cwd=WHISPER_DIR, capture=True)
+            if ok:
+                multi_config = True
+
+        if not ok:
+            # C: Build Tools only — vcvarsall.bat + Ninja (Ninja ships with Build Tools)
+            ok, out = _run_vcvarsall(
+                base_cmake + ["-G", "Ninja", "-DCMAKE_BUILD_TYPE=Release"],
+                cwd=WHISPER_DIR,
+            )
+            if ok:
+                via_vcvarsall = True
+
+        if not ok:
+            # D: plain run — may work in Dev Prompt that wasn't detected
+            ok, out = run(base_cmake, cwd=WHISPER_DIR, capture=True)
+            multi_config = ok
+
     if not ok:
         hint = _no_compiler_hint()
         if arch == "cuda" and ("nvcc" in out or "CUDA Toolkit" in out or "CUDAToolkit" in out):
@@ -180,25 +207,25 @@ def build(arch: str = "cpu") -> tuple[bool, str]:
                 "Или: winget install -e --id Nvidia.CUDA\n"
                 "После установки перезапустите консоль."
             )
-        if arch == "amd" and ("Vulkan" in out or "vulkan" in out):
+        if arch == "amd" and ("vulkan" in out.lower()):
             hint += (
                 "\n\nДля AMD нужен Vulkan SDK (LunarG). "
                 "Установить: пункт 0 батника → ответить «y» на вопрос про Vulkan SDK. "
                 "Или: winget install KhronosGroup.VulkanSDK\n"
                 "После установки перезапустите консоль."
             )
-        if "nmake" in out.lower() or "CMAKE_C_COMPILER not set" in out:
-            hint += (
-                "\n\nЕсли ошибка повторяется — удалите папку whisper.cpp\\build вручную "
-                "и запустите сборку снова."
-            )
         return False, f"cmake configure failed: {out}{hint}"
 
     print(f"Building whisper.cpp (Release) for {arch}...")
-    ok, out = run_msvc(
-        ["cmake", "--build", f"build-{arch}", "--config", "Release", "-j"],
-        cwd=WHISPER_DIR,
-    )
+    build_cmd = ["cmake", "--build", f"build-{arch}", "-j"]
+    if multi_config:
+        build_cmd += ["--config", "Release"]
+
+    if via_vcvarsall:
+        ok, out = _run_vcvarsall(build_cmd, cwd=WHISPER_DIR)
+    else:
+        ok, out = run(build_cmd, cwd=WHISPER_DIR, capture=True)
+
     if not ok:
         return False, (
             f"Build failed: {out}\n"
@@ -208,15 +235,22 @@ def build(arch: str = "cpu") -> tuple[bool, str]:
 
 
 def copy_to_bin(arch: str = "cpu") -> tuple[bool, str]:
-    release = WHISPER_DIR / f"build-{arch}" / "bin" / "Release"
-    cli_exe = release / "whisper-cli.exe"
-    if not cli_exe.exists():
-        return False, f"Build artifact not found: {cli_exe}"
+    build_dir = WHISPER_DIR / f"build-{arch}"
+    # VS generator (multi-config) puts exe in bin/Release/; Ninja puts it in bin/
+    for subdir in [Path("bin") / "Release", Path("bin")]:
+        cli_exe = build_dir / subdir / "whisper-cli.exe"
+        if cli_exe.exists():
+            break
+    else:
+        return False, (
+            f"Build artifact not found in {build_dir}/bin/[Release/]\n"
+            "Убедитесь что сборка прошла успешно."
+        )
 
     BIN_DIR.mkdir(parents=True, exist_ok=True)
     dest_name = f"main-{arch}.exe"
     shutil.copy2(cli_exe, BIN_DIR / dest_name)
-    for dll in release.glob("*.dll"):
+    for dll in cli_exe.parent.glob("*.dll"):
         shutil.copy2(dll, BIN_DIR / dll.name)
     print(f"Copied {dest_name} and DLLs to {BIN_DIR}.")
     return True, ""
