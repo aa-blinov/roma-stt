@@ -95,14 +95,121 @@ function Show-Menu {
 # Menu actions
 # ---------------------------------------------------------------------------
 
+function Install-Tools {
+    param([string]$arch = "cpu")
+
+    # winget
+    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+        Write-Host "winget не найден. Пробую установить автоматически..." -ForegroundColor Yellow
+        try {
+            powershell -NoProfile -Command @'
+$progressPreference='silentlyContinue'
+Install-PackageProvider -Name NuGet -Force -Scope CurrentUser | Out-Null
+Install-Module -Name Microsoft.WinGet.Client -Force -Repository PSGallery -Scope CurrentUser | Out-Null
+Repair-WinGetPackageManager -AllUsers 2>$null
+'@
+        } catch {}
+        if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+            Write-Host "winget не установлен. Установите программы вручную:" -ForegroundColor Red
+            Write-Host "  uv:    winget install astral-sh.uv"
+            Write-Host "  Git:   winget install Git.Git"
+            Write-Host "  CMake: winget install Kitware.CMake"
+            Write-Host "  VS:    https://visualstudio.microsoft.com/visual-cpp-build-tools/"
+            return $false
+        }
+        Write-Host "winget установлен." -ForegroundColor Green
+    }
+
+    # uv
+    if (Get-Command uv -ErrorAction SilentlyContinue) {
+        Write-Host "uv уже установлен." -ForegroundColor DarkGray
+    } else {
+        Write-Host "Устанавливаю uv..." -ForegroundColor Yellow
+        & winget install --id astral-sh.uv --accept-package-agreements --accept-source-agreements
+    }
+
+    # Git
+    if (Get-Command git -ErrorAction SilentlyContinue) {
+        Write-Host "Git уже установлен." -ForegroundColor DarkGray
+    } else {
+        Write-Host "Устанавливаю Git..." -ForegroundColor Yellow
+        & winget install --id Git.Git --accept-package-agreements --accept-source-agreements
+    }
+
+    # CMake
+    if (Get-Command cmake -ErrorAction SilentlyContinue) {
+        Write-Host "CMake уже установлен." -ForegroundColor DarkGray
+    } else {
+        Write-Host "Устанавливаю CMake..." -ForegroundColor Yellow
+        & winget install --id Kitware.CMake --accept-package-agreements --accept-source-agreements
+    }
+
+    # VS Build Tools
+    $vsInstalled = $false
+    if (Get-Command cl -ErrorAction SilentlyContinue) {
+        $vsInstalled = $true
+        Write-Host "Компилятор Visual Studio уже найден в PATH." -ForegroundColor DarkGray
+    }
+    if (-not $vsInstalled) {
+        $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+        if (Test-Path $vswhere) {
+            $vsPath = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath 2>$null
+            if ($vsPath) { $vsInstalled = $true; Write-Host "Visual Studio Build Tools уже установлены." -ForegroundColor DarkGray }
+        }
+    }
+    if (-not $vsInstalled) {
+        Write-Host ""
+        Write-Host "Visual Studio Build Tools (C++) нужны для сборки распознавания речи." -ForegroundColor Yellow
+        $vs = Read-Host "Установить сейчас? Большой пакет (~5 ГБ). (y/N)"
+        if ($vs -match '^[yYдД]$') {
+            Write-Host "Устанавливаю VS Build Tools..."
+            & winget install --id Microsoft.VisualStudio.2022.BuildTools --override "--wait --passive --add Microsoft.VisualStudio.Workload.VCTools" --accept-package-agreements --accept-source-agreements
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "Сбой. Откройте Visual Studio Installer из меню Пуск → Изменить → C++ Build Tools." -ForegroundColor Red
+            } else {
+                Write-Host "Может потребоваться перезагрузка." -ForegroundColor Yellow
+            }
+        } else {
+            Write-Host "Пропущено — сборка whisper.cpp может не сработать." -ForegroundColor DarkGray
+        }
+    }
+
+    # CUDA (только для режима cuda)
+    if ($arch -eq "cuda") {
+        if (Get-Command nvcc -ErrorAction SilentlyContinue) {
+            Write-Host "CUDA Toolkit уже установлен." -ForegroundColor DarkGray
+        } else {
+            Write-Host ""
+            Write-Host "CUDA Toolkit нужен для режима cuda (~3 ГБ)." -ForegroundColor Yellow
+            $cuda = Read-Host "Установить сейчас? (y/N)"
+            if ($cuda -match '^[yYдД]$') {
+                & winget install -e --id Nvidia.CUDA --accept-package-agreements --accept-source-agreements --silent
+                Write-Host "После установки может потребоваться перезагрузка." -ForegroundColor Yellow
+            }
+        }
+    }
+
+    # Vulkan SDK (только для режима amd)
+    if ($arch -eq "amd") {
+        if (Get-Command vulkaninfo -ErrorAction SilentlyContinue) {
+            Write-Host "Vulkan SDK уже установлен." -ForegroundColor DarkGray
+        } else {
+            Write-Host ""
+            Write-Host "Vulkan SDK нужен для режима amd (~200 МБ)." -ForegroundColor Yellow
+            $vulkan = Read-Host "Установить сейчас? (y/N)"
+            if ($vulkan -match '^[yYдД]$') {
+                & winget install --id KhronosGroup.VulkanSDK --accept-package-agreements --accept-source-agreements
+            }
+        }
+    }
+
+    return $true
+}
+
 function Do-Install {
     Write-Host "[1] Установка..." -ForegroundColor Cyan
-    if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
-        Write-Host "uv не найден." -ForegroundColor Red
-        Write-Host "Установите командой:  winget install astral-sh.uv"
-        Write-Host "Затем закройте это окно, откройте заново и снова выберите 1."
-        Pause-Continue; return
-    }
+
+    # Выбор архитектуры (до установки инструментов — не нужен uv)
     $gpu = Detect-Gpu
     $a = "cpu"
     if ($gpu.NvidiaName -or $gpu.AmdName) {
@@ -124,8 +231,24 @@ function Do-Install {
     } else {
         Write-Host "  Дискретная видеокарта не обнаружена — будет CPU-режим." -ForegroundColor DarkGray
     }
+
+    # Установка системных инструментов через winget
     Write-Host ""
-    Write-Host "Запуск установки (среда, зависимости, сборка whisper [$a], модель)..."
+    Write-Host "Шаг 1/2: Проверка и установка системных инструментов..." -ForegroundColor Cyan
+    $ok = Install-Tools $a
+    if (-not $ok) { Pause-Continue; return }
+
+    # Проверяем uv после установки (PATH может не обновиться без перезапуска)
+    if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
+        Write-Host ""
+        Write-Host "uv только что установлен, но PATH ещё не обновился." -ForegroundColor Yellow
+        Write-Host "Закройте это окно, откройте снова и снова выберите 1." -ForegroundColor Yellow
+        Pause-Continue; return
+    }
+
+    # Установка Python-окружения, whisper.cpp, модели
+    Write-Host ""
+    Write-Host "Шаг 2/2: Установка окружения, сборка whisper [$a], загрузка модели..." -ForegroundColor Cyan
     & uv run python scripts/install.py --arch $a
     Pause-Continue
 }
