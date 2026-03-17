@@ -320,8 +320,6 @@ def main() -> None:
             except Exception as e:
                 logger.exception("unexpected error: %s", e)
                 _notify(f"Ошибка: {e}")
-            finally:
-                Path(wav_path).unlink(missing_ok=True)
             wav_path = None
 
     def wnd_proc(hwnd, msg, wparam, lparam):
