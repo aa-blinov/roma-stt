@@ -98,10 +98,11 @@ def copy_to_bin(arch: str = "cpu") -> tuple[bool, str]:
         return False, f"Build artifact not found: {cli_exe}"
 
     BIN_DIR.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(cli_exe, BIN_DIR / "main.exe")
+    dest_name = f"main-{arch}.exe"
+    shutil.copy2(cli_exe, BIN_DIR / dest_name)
     for dll in release.glob("*.dll"):
         shutil.copy2(dll, BIN_DIR / dll.name)
-    print(f"Copied main.exe and DLLs to {BIN_DIR}.")
+    print(f"Copied {dest_name} and DLLs to {BIN_DIR}.")
     return True, ""
 
 
@@ -113,7 +114,7 @@ def update_config(arch: str = "cpu") -> None:
 
     data = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
     key = f"whisper_cpp_path_{arch}"
-    data[key] = "bin/main.exe"
+    data[key] = f"bin/main-{arch}.exe"
     data["module"] = arch
     config_path.write_text(
         yaml.dump(data, allow_unicode=True, default_flow_style=False),

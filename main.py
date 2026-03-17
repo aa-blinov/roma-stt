@@ -237,7 +237,7 @@ def main() -> None:
             try:
                 lang = config.get("language", "ru")
                 gpu_layers = 99 if module != "cpu" else 0
-                logger.info("transcribe start | lang=%s gpu_layers=%s wav=%s", lang, gpu_layers, wav_path)
+                logger.info("transcribe start | lang=%s module=%s gpu_layers=%s wav=%s", lang, module, gpu_layers, wav_path)
                 text = engine.transcribe(wav_path, language=lang, n_gpu_layers=gpu_layers)
                 length = len(text) if text else 0
                 preview = (text[:80] + "…") if text and len(text) > 80 else (text or "")

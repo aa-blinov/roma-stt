@@ -298,21 +298,33 @@ if not exist .venv (
     pause
     goto menu
 )
-uv run python scripts\check_ready.py >nul 2>&1
-if errorlevel 1 (
-    echo Проверка готовности не прошла. Сделайте по порядку: 1 ^(Установка^), потом 2 ^(Проверка^). Когда в пункте 2 будет «Ready» — снова выберите 3.
-    pause
-    goto menu
-)
-for /f "usebackq tokens=*" %%i in (`uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print(cfg.get('module', 'cpu'))"`) do set "current_mod=%%i"
 echo   1 = cpu  2 = cuda  3 = amd
 set /p mod="Режим (1/2/3, Enter — в главное меню): "
 if "!mod!"=="" goto menu
 if "!mod!"=="1" set mod=cpu
 if "!mod!"=="2" set mod=cuda
 if "!mod!"=="3" set mod=amd
+if not exist "bin\main-!mod!.exe" (
+    echo Бинарник bin\main-!mod!.exe не найден. Запускается сборка whisper.cpp [!mod!]...
+    echo Это займёт несколько минут. Не закрывайте окно.
+    uv run python scripts\build_whisper_cpp.py --arch !mod!
+    if errorlevel 1 (
+        echo.
+        echo Сборка завершилась с ошибкой. Проверьте зависимости ^(пункт 0^) и повторите.
+        pause
+        goto menu
+    )
+    echo Сборка завершена.
+    echo.
+)
 set "cfgfile=config.yaml"
 uv run python -c "from infrastructure.config_repo import load_config, save_config; from pathlib import Path; import sys; p=Path('!cfgfile!'); cfg=load_config(p); cfg['module']=sys.argv[1]; save_config(p,cfg)" "!mod!"
+uv run python scripts\check_ready.py >nul 2>&1
+if errorlevel 1 (
+    echo Проверка готовности не прошла. Сделайте по порядку: 1 ^(Установка^), потом 2 ^(Проверка^). Когда в пункте 2 будет «Ready» — снова выберите 3.
+    pause
+    goto menu
+)
 for /f "usebackq tokens=*" %%a in (`uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print(cfg.get('hotkey_record', 'Ctrl+F2'))"`) do set "hk_r=%%a"
 for /f "usebackq tokens=*" %%b in (`uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print(cfg.get('hotkey_stop', 'Ctrl+F3'))"`) do set "hk_s=%%b"
 echo Служба запускается в трее. Запись: !hk_r!, Стоп: !hk_s!
