@@ -180,15 +180,10 @@ if errorlevel 1 (
     goto menu
 )
 call :detect_gpu
-if "!gpu_nvidia!"=="1" if "!gpu_amd!"=="1" (
-    echo   1 = cpu  2 = cuda ^(NVIDIA^)  3 = amd ^(AMD/Radeon^)
-) else if "!gpu_nvidia!"=="1" (
-    echo   1 = cpu  2 = cuda ^(NVIDIA обнаружена^)
-) else if "!gpu_amd!"=="1" (
-    echo   1 = cpu  3 = amd ^(AMD/Radeon обнаружена^)
-) else (
-    echo   1 = cpu  ^(видеокарта NVIDIA/AMD не обнаружена^)
-)
+echo   1 = cpu  ^(без GPU, всегда работает^)
+if "!gpu_nvidia!"=="1" echo   2 = cuda ^(!gpu_nvidia_name!^)
+if "!gpu_amd!"=="1"    echo   3 = amd  ^(!gpu_amd_name!^)
+if "!gpu_nvidia!"=="0" if "!gpu_amd!"=="0" echo   ^(дискретная видеокарта не обнаружена, доступен только cpu^)
 set /p arch="Архитектура (1/2/3, Enter — в главное меню): "
 if "!arch!"=="" goto menu
 set a=cpu
@@ -337,15 +332,10 @@ if not exist .venv (
     goto menu
 )
 call :detect_gpu
-if "!gpu_nvidia!"=="1" if "!gpu_amd!"=="1" (
-    echo   1 = cpu  2 = cuda ^(NVIDIA^)  3 = amd ^(AMD/Radeon^)
-) else if "!gpu_nvidia!"=="1" (
-    echo   1 = cpu  2 = cuda ^(NVIDIA обнаружена^)
-) else if "!gpu_amd!"=="1" (
-    echo   1 = cpu  3 = amd ^(AMD/Radeon обнаружена^)
-) else (
-    echo   1 = cpu  ^(видеокарта NVIDIA/AMD не обнаружена^)
-)
+echo   1 = cpu  ^(без GPU, всегда работает^)
+if "!gpu_nvidia!"=="1" echo   2 = cuda ^(!gpu_nvidia_name!^)
+if "!gpu_amd!"=="1"    echo   3 = amd  ^(!gpu_amd_name!^)
+if "!gpu_nvidia!"=="0" if "!gpu_amd!"=="0" echo   ^(дискретная видеокарта не обнаружена, доступен только cpu^)
 set /p mod="Режим (1/2/3, Enter — в главное меню): "
 if "!mod!"=="" goto menu
 if "!mod!"=="1" set mod=cpu
@@ -410,10 +400,15 @@ goto menu
 :detect_gpu
 set gpu_nvidia=0
 set gpu_amd=0
-wmic path win32_VideoController get name 2>nul | findstr /i "NVIDIA" >nul
-if not errorlevel 1 set gpu_nvidia=1
-wmic path win32_VideoController get name 2>nul | findstr /i "AMD" >nul
-if not errorlevel 1 set gpu_amd=1
-wmic path win32_VideoController get name 2>nul | findstr /i "Radeon" >nul
-if not errorlevel 1 set gpu_amd=1
+set gpu_nvidia_name=NVIDIA
+set gpu_amd_name=AMD/Radeon
+for /f "skip=1 tokens=*" %%G in ('wmic path win32_VideoController get name 2^>nul') do (
+    set "line=%%G"
+    set "line=!line: =!"
+    if not "!line!"=="" (
+        echo !line! | findstr /i "NVIDIA" >nul && (set gpu_nvidia=1 & set "gpu_nvidia_name=%%G")
+        echo !line! | findstr /i "AMD Radeon\|Radeon RX\|Radeon HD\|Radeon R" >nul && (set gpu_amd=1 & set "gpu_amd_name=%%G")
+        echo !line! | findstr /i "AMD" >nul && if "!gpu_amd!"=="0" (set gpu_amd=1 & set "gpu_amd_name=%%G")
+    )
+)
 exit /b 0
