@@ -54,21 +54,39 @@ def _find_vs_generator() -> str | None:
 
 
 def _find_vcvarsall() -> Path | None:
-    """Find vcvarsall.bat for VS IDE or Build Tools installation."""
-    if not _VSWHERE.exists():
-        return None
-    try:
-        r = subprocess.run(
-            [str(_VSWHERE), "-latest", "-products", "*", "-property", "installationPath"],
-            capture_output=True, text=True, timeout=15,
-        )
-        install_path = r.stdout.strip()
-    except Exception:
-        return None
-    if not install_path:
-        return None
-    vcvarsall = Path(install_path) / "VC" / "Auxiliary" / "Build" / "vcvarsall.bat"
-    return vcvarsall if vcvarsall.exists() else None
+    """Find vcvarsall.bat for VS IDE or Build Tools.
+
+    First tries vswhere, then falls back to searching well-known install paths.
+    This handles cases where vswhere is unavailable or returns nothing.
+    """
+    # 1. Try vswhere
+    if _VSWHERE.exists():
+        try:
+            r = subprocess.run(
+                [str(_VSWHERE), "-latest", "-products", "*", "-property", "installationPath"],
+                capture_output=True, text=True, timeout=15,
+            )
+            install_path = r.stdout.strip()
+            if install_path:
+                vc = Path(install_path) / "VC" / "Auxiliary" / "Build" / "vcvarsall.bat"
+                if vc.exists():
+                    return vc
+        except Exception:
+            pass
+
+    # 2. Fallback: scan well-known install locations
+    for base in [
+        Path("C:/Program Files (x86)/Microsoft Visual Studio"),
+        Path("C:/Program Files/Microsoft Visual Studio"),
+    ]:
+        if not base.exists():
+            continue
+        for year in ["2022", "2019", "2017"]:
+            for edition in ["BuildTools", "Enterprise", "Professional", "Community"]:
+                vc = base / year / edition / "VC" / "Auxiliary" / "Build" / "vcvarsall.bat"
+                if vc.exists():
+                    return vc
+    return None
 
 
 def _compiler_in_path() -> bool:
