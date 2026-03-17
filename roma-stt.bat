@@ -184,20 +184,23 @@ echo   1 = cpu  ^(без GPU, всегда работает^)
 if "!gpu_nvidia!"=="1" echo   2 = cuda ^(!gpu_nvidia_name!^)
 if "!gpu_amd!"=="1"    echo   3 = amd  ^(!gpu_amd_name!^)
 if "!gpu_nvidia!"=="0" if "!gpu_amd!"=="0" echo   ^(дискретная видеокарта не обнаружена, доступен только cpu^)
-set /p arch="Архитектура (1/2/3, Enter — в главное меню): "
+set "arch_hint=1"
+if "!gpu_nvidia!"=="1" set "arch_hint=!arch_hint!/2"
+if "!gpu_amd!"=="1"    set "arch_hint=!arch_hint!/3"
+set /p arch="Архитектура (!arch_hint!, Enter — в главное меню): "
 if "!arch!"=="" goto menu
 set a=cpu
 if "!arch!"=="2" set a=cuda
 if "!arch!"=="3" set a=amd
 if "!arch!"=="2" if "!gpu_nvidia!"=="0" (
     echo.
-    echo  Выбран CUDA, но видеокарта NVIDIA не обнаружена. Используйте cpu ^(1^) или amd ^(3^).
+    echo  Выбран CUDA, но видеокарта NVIDIA не обнаружена.
     pause
     goto install
 )
 if "!arch!"=="3" if "!gpu_amd!"=="0" (
     echo.
-    echo  Выбран AMD, но видеокарта AMD/Radeon не обнаружена. Используйте cpu ^(1^) или cuda ^(2^).
+    echo  Выбран AMD, но видеокарта AMD/Radeon не обнаружена.
     pause
     goto install
 )
@@ -336,20 +339,23 @@ echo   1 = cpu  ^(без GPU, всегда работает^)
 if "!gpu_nvidia!"=="1" echo   2 = cuda ^(!gpu_nvidia_name!^)
 if "!gpu_amd!"=="1"    echo   3 = amd  ^(!gpu_amd_name!^)
 if "!gpu_nvidia!"=="0" if "!gpu_amd!"=="0" echo   ^(дискретная видеокарта не обнаружена, доступен только cpu^)
-set /p mod="Режим (1/2/3, Enter — в главное меню): "
+set "mod_hint=1"
+if "!gpu_nvidia!"=="1" set "mod_hint=!mod_hint!/2"
+if "!gpu_amd!"=="1"    set "mod_hint=!mod_hint!/3"
+set /p mod="Режим (!mod_hint!, Enter — в главное меню): "
 if "!mod!"=="" goto menu
 if "!mod!"=="1" set mod=cpu
 if "!mod!"=="2" set mod=cuda
 if "!mod!"=="3" set mod=amd
 if "!mod!"=="cuda" if "!gpu_nvidia!"=="0" (
     echo.
-    echo  Выбран CUDA, но видеокарта NVIDIA не обнаружена. Используйте cpu ^(1^) или amd ^(3^).
+    echo  Выбран CUDA, но видеокарта NVIDIA не обнаружена.
     pause
     goto start
 )
 if "!mod!"=="amd" if "!gpu_amd!"=="0" (
     echo.
-    echo  Выбран AMD, но видеокарта AMD/Radeon не обнаружена. Используйте cpu ^(1^) или cuda ^(2^).
+    echo  Выбран AMD, но видеокарта AMD/Radeon не обнаружена.
     pause
     goto start
 )
@@ -400,15 +406,28 @@ goto menu
 :detect_gpu
 set gpu_nvidia=0
 set gpu_amd=0
-set gpu_nvidia_name=NVIDIA
-set gpu_amd_name=AMD/Radeon
+set "gpu_nvidia_name=NVIDIA"
+set "gpu_amd_name=AMD/Radeon"
 for /f "skip=1 tokens=*" %%G in ('wmic path win32_VideoController get name 2^>nul') do (
-    set "line=%%G"
-    set "line=!line: =!"
-    if not "!line!"=="" (
-        echo !line! | findstr /i "NVIDIA" >nul && (set gpu_nvidia=1 & set "gpu_nvidia_name=%%G")
-        echo !line! | findstr /i "AMD Radeon\|Radeon RX\|Radeon HD\|Radeon R" >nul && (set gpu_amd=1 & set "gpu_amd_name=%%G")
-        echo !line! | findstr /i "AMD" >nul && if "!gpu_amd!"=="0" (set gpu_amd=1 & set "gpu_amd_name=%%G")
+    set "gpuline=%%G"
+    if not "!gpuline: =!"=="" (
+        echo %%G | findstr /i "NVIDIA" >nul
+        if not errorlevel 1 (
+            set gpu_nvidia=1
+            set "gpu_nvidia_name=%%G"
+        )
+        echo %%G | findstr /i "Radeon" >nul
+        if not errorlevel 1 (
+            set gpu_amd=1
+            set "gpu_amd_name=%%G"
+        )
+        if "!gpu_amd!"=="0" (
+            echo %%G | findstr /i "AMD" >nul
+            if not errorlevel 1 (
+                set gpu_amd=1
+                set "gpu_amd_name=%%G"
+            )
+        )
     )
 )
 exit /b 0
