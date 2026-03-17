@@ -1,5 +1,6 @@
 """Clone/pull whisper.cpp, build with CMake, copy exe and DLLs to bin/. For automated install."""
 
+import os
 import shutil
 import subprocess
 import sys
@@ -9,6 +10,31 @@ ROOT = Path(__file__).resolve().parent.parent
 WHISPER_DIR = ROOT / "whisper.cpp"
 BIN_DIR = ROOT / "bin"
 REPO_URL = "https://github.com/ggml-org/whisper.cpp.git"
+
+_VSWHERE = Path("C:/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe")
+
+
+def _find_vcvarsall() -> Path | None:
+    """Find vcvarsall.bat for the latest VS installation via vswhere."""
+    if not _VSWHERE.exists():
+        return None
+    try:
+        r = subprocess.run(
+            [str(_VSWHERE), "-latest", "-property", "installationPath"],
+            capture_output=True, text=True, timeout=15,
+        )
+        install_path = r.stdout.strip()
+    except Exception:
+        return None
+    if not install_path:
+        return None
+    vcvarsall = Path(install_path) / "VC" / "Auxiliary" / "Build" / "vcvarsall.bat"
+    return vcvarsall if vcvarsall.exists() else None
+
+
+def _compiler_in_path() -> bool:
+    """Return True if cl.exe is already available (Developer Command Prompt)."""
+    return shutil.which("cl") is not None
 
 
 def run(cmd: list[str], cwd: Path, capture: bool = False) -> tuple[bool, str]:
@@ -22,6 +48,28 @@ def run(cmd: list[str], cwd: Path, capture: bool = False) -> tuple[bool, str]:
     if capture:
         return r.returncode == 0, (r.stdout or "") + (r.stderr or "")
     return r.returncode == 0, ""
+
+
+def run_msvc(cmd: list[str], cwd: Path) -> tuple[bool, str]:
+    """Run cmd with MSVC environment initialized (vcvarsall x64), or plain if already set."""
+    if _compiler_in_path():
+        return run(cmd, cwd, capture=True)
+
+    vcvarsall = _find_vcvarsall()
+    if vcvarsall:
+        # Wrap: call vcvarsall to set MSVC env, then run our command
+        wrapped = f'call "{vcvarsall}" x64 2>&1 && {subprocess.list2cmdline(cmd)}'
+        r = subprocess.run(
+            ["cmd", "/c", wrapped],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=600,
+        )
+        return r.returncode == 0, (r.stdout or "") + (r.stderr or "")
+
+    # No vcvarsall found — try plain (may fail with compiler errors)
+    return run(cmd, cwd, capture=True)
 
 
 def check_tools() -> tuple[bool, str]:
@@ -51,12 +99,25 @@ def clone_or_pull() -> tuple[bool, str]:
     return True, ""
 
 
+def _no_compiler_hint() -> str:
+    if _compiler_in_path():
+        return ""
+    vcvarsall = _find_vcvarsall()
+    if vcvarsall:
+        return ""  # will be set up automatically via run_msvc
+    return (
+        "\n\nMSVC-компилятор не найден и Visual Studio Build Tools не обнаружены автоматически.\n"
+        "Установите через батник пункт 0 (Установка программ) или вручную:\n"
+        "  winget install Microsoft.VisualStudio.2022.BuildTools\n"
+        "После установки перезапустите консоль и повторите сборку."
+    )
+
+
 def build(arch: str = "cpu") -> tuple[bool, str]:
     print(f"Configuring whisper.cpp (cmake) for {arch}...")
     cmake_args = [
         "cmake",
-        "-B",
-        "build",
+        "-B", "build",
         "-DWHISPER_BUILD_EXAMPLES=ON",
         "-DWHISPER_BUILD_TESTS=OFF",
     ]
@@ -65,28 +126,34 @@ def build(arch: str = "cpu") -> tuple[bool, str]:
     elif arch == "amd":
         cmake_args.append("-DGGML_VULKAN=ON")
 
-    ok, out = run(cmake_args, cwd=WHISPER_DIR, capture=True)
+    ok, out = run_msvc(cmake_args, cwd=WHISPER_DIR)
     if not ok:
-        hint = ""
+        hint = _no_compiler_hint()
         if arch == "cuda" and ("nvcc" in out or "CUDA Toolkit" in out or "CUDAToolkit" in out):
-            hint = (
+            hint += (
                 "\n\nДля CUDA нужен NVIDIA CUDA Toolkit. "
-                "Установить через батник: пункт 0 (Установка программ), затем ответить «y» на вопрос про CUDA. "
-                "Или вручную: winget install -e --id Nvidia.CUDA или https://developer.nvidia.com/cuda-downloads\n"
-                "После установки перезапустите консоль. Если cmake не находит nvcc, задайте: set CUDAToolkit_ROOT=C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.x"
+                "Установить: пункт 0 батника → ответить «y» на вопрос про CUDA. "
+                "Или: winget install -e --id Nvidia.CUDA\n"
+                "После установки перезапустите консоль."
+            )
+        if arch == "amd" and ("Vulkan" in out or "vulkan" in out):
+            hint += (
+                "\n\nДля AMD нужен Vulkan SDK (LunarG). "
+                "Установить: пункт 0 батника → ответить «y» на вопрос про Vulkan SDK. "
+                "Или: winget install KhronosGroup.VulkanSDK\n"
+                "После установки перезапустите консоль."
             )
         return False, f"cmake configure failed: {out}{hint}"
 
     print(f"Building whisper.cpp (Release) for {arch}...")
-    ok, out = run(
+    ok, out = run_msvc(
         ["cmake", "--build", "build", "--config", "Release", "-j"],
         cwd=WHISPER_DIR,
-        capture=True,
     )
     if not ok:
         return False, (
             f"Build failed: {out}\n"
-            "Ensure necessary build tools and SDKs (CUDA Toolkit for NVIDIA, Vulkan SDK for AMD) are installed."
+            "Убедитесь что нужные SDK установлены (CUDA Toolkit для NVIDIA, Vulkan SDK для AMD)."
         )
     return True, ""
 
