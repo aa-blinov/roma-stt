@@ -21,7 +21,7 @@ if /i "%cmd%"=="install-tools" goto do_install_tools
 if /i "%cmd%"=="start" goto do_start
 if /i "%cmd%"=="stop" goto do_stop
 echo Неизвестная команда: %cmd%
-echo Доступные команды: install-tools, install, check, download ^<имя^>, build-whisper, build-check, setup, test-model, start [cpu^|cuda^|amd], stop
+echo Доступные команды: install-tools, install, check, download ^<имя^>, build-whisper, build-check, setup, test-model, start [cpu^|cuda^|amd], stop, toggle-notifications
 exit /b 1
 
 :do_install
@@ -138,9 +138,12 @@ echo.
 echo  11. Удалить установку
 echo      Удалить .venv и models (полная очистка, потом снова пункт 1).
 echo.
-echo  12. Выход
+echo  12. Уведомления Windows
+echo      Включить или выключить всплывающие уведомления (по умолчанию выключены).
 echo.
-set /p choice="Введите цифру (0-12, Enter — обновить меню): "
+echo  13. Выход
+echo.
+set /p choice="Введите цифру (0-13, Enter — обновить меню): "
 if "!choice!"=="" goto menu
 if "%choice%"=="0" goto install_tools
 if "%choice%"=="1" goto install
@@ -154,8 +157,9 @@ if "%choice%"=="8" goto set_hotkey_stop
 if "%choice%"=="9" goto set_language
 if "%choice%"=="10" goto set_input_device
 if "%choice%"=="11" goto remove
-if "%choice%"=="12" exit /b 0
-echo Неизвестный выбор. Введите цифру от 0 до 12.
+if "%choice%"=="12" goto toggle_notifications
+if "%choice%"=="13" exit /b 0
+echo Неизвестный выбор. Введите цифру от 0 до 13.
 goto menu
 
 :install_tools
@@ -197,6 +201,19 @@ if not exist .venv (
     echo.
 )
 uv run python scripts\check_ready.py
+pause
+goto menu
+
+:toggle_notifications
+echo [12] Уведомления Windows...
+if not exist .venv (
+    echo Сначала выполните 1 ^(Установка^).
+    pause
+    goto menu
+)
+for /f "usebackq tokens=*" %%a in (`uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print('включены' if cfg.get('notifications', False) else 'выключены')"`) do set "notif_cur=%%a"
+echo Сейчас уведомления: !notif_cur!
+uv run python -c "from infrastructure.config_repo import load_config, save_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); cfg['notifications']=not cfg.get('notifications', False); save_config(p,cfg); print('Уведомления теперь:', 'включены' if cfg['notifications'] else 'выключены')"
 pause
 goto menu
 

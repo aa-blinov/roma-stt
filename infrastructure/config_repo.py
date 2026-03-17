@@ -15,6 +15,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "whisper_model_path": "",
     "language": "ru",
     "input_device": None,  # None = системный микрофон по умолчанию, иначе индекс устройства
+    "notifications": False,  # всплывающие уведомления Windows (по умолчанию выключены)
 }
 
 

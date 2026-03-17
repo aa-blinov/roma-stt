@@ -170,6 +170,16 @@ def main() -> None:
     )
     tray_ref: list = [icon]  # for notifications from hotkey thread
 
+    def _notify(msg: str) -> None:
+        """Показать уведомление в трее, если включено в config.yaml (notifications: true)."""
+        if not config.get("notifications", False):
+            return
+        if tray_ref and tray_ref[0]:
+            try:
+                tray_ref[0].notify(msg, "Roma-STT")
+            except Exception:
+                pass
+
     def on_record() -> None:
         """Старт записи (только по клавише «запись»)."""
         nonlocal record_thread, wav_path
@@ -225,14 +235,7 @@ def main() -> None:
             except Exception as e:
                 logger.exception("save_config after device fallback: %s", e)
             logger.warning("input device was invalid, used default; cleared input_device in config")
-            if tray_ref and tray_ref[0]:
-                try:
-                    tray_ref[0].notify(
-                        "Микрофон из конфига недоступен. Использован системный по умолчанию. Выберите устройство в пункте 10.",
-                        "Roma-STT",
-                    )
-                except Exception:
-                    pass
+            _notify("Микрофон из конфига недоступен. Использован системный по умолчанию. Выберите устройство в пункте 10.")
         if wav_path:
             try:
                 lang = config.get("language", "ru")
@@ -244,39 +247,17 @@ def main() -> None:
                 logger.info("transcribe done | length=%d preview=%r", length, preview)
                 if not (text and text.strip()):
                     logger.warning("transcribe empty result")
-                    if tray_ref and tray_ref[0]:
-                        try:
-                            tray_ref[0].notify(
-                                "Ничего не распознано. Говорите чётко, подольше; проверьте микрофон.",
-                                "Roma-STT",
-                            )
-                        except Exception:
-                            pass
+                    _notify("Ничего не распознано. Говорите чётко, подольше; проверьте микрофон.")
                 else:
                     paste_text(text)
                     logger.info("paste done | length=%d", length)
-                    if tray_ref and tray_ref[0]:
-                        try:
-                            tray_ref[0].notify("Текст вставлен.", "Roma-STT")
-                        except Exception:
-                            pass
+                    _notify("Текст вставлен.")
             except (FileNotFoundError, subprocess.CalledProcessError) as e:
                 logger.exception("transcribe failed: %s", e)
-                if tray_ref and tray_ref[0]:
-                    try:
-                        tray_ref[0].notify(
-                            "Ошибка распознавания (нет exe или сбой). Пункт 2 — проверка, пункт 1 — установка.",
-                            "Roma-STT",
-                        )
-                    except Exception:
-                        pass
+                _notify("Ошибка распознавания (нет exe или сбой). Пункт 2 — проверка, пункт 1 — установка.")
             except Exception as e:
                 logger.exception("unexpected error: %s", e)
-                if tray_ref and tray_ref[0]:
-                    try:
-                        tray_ref[0].notify(f"Ошибка: {e}", "Roma-STT")
-                    except Exception:
-                        pass
+                _notify(f"Ошибка: {e}")
             finally:
                 Path(wav_path).unlink(missing_ok=True)
             wav_path = None
