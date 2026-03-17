@@ -51,11 +51,11 @@ function Detect-Gpu {
 
 function Get-MenuConfig {
     # Одним вызовом Python читаем все нужные для меню значения
-    if (-not (Test-Path ".venv")) { return @{ lang = ""; notif = ""; post = "" } }
-    $raw = & uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print(cfg.get('language','ru'), cfg.get('notifications', False), cfg.get('postprocess', True), sep='|')" 2>$null
-    if (-not $raw) { return @{ lang = "ru"; notif = "False"; post = "True" } }
+    if (-not (Test-Path ".venv")) { return @{ lang = ""; notif = ""; post = ""; model = ""; hkr = ""; hks = "" } }
+    $raw = & uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); mp=cfg.get('whisper_model_path',''); model=Path(mp).stem if mp else ''; print(cfg.get('language','ru'), cfg.get('notifications', False), cfg.get('postprocess', True), model, cfg.get('hotkey_record','Ctrl+F2'), cfg.get('hotkey_stop','Ctrl+F3'), sep='|')" 2>$null
+    if (-not $raw) { return @{ lang = "ru"; notif = "False"; post = "True"; model = ""; hkr = "Ctrl+F2"; hks = "Ctrl+F3" } }
     $parts = $raw.Trim().Split('|')
-    return @{ lang = $parts[0]; notif = $parts[1]; post = $parts[2] }
+    return @{ lang = $parts[0]; notif = $parts[1]; post = $parts[2]; model = $parts[3]; hkr = $parts[4]; hks = $parts[5] }
 }
 
 function Show-Menu {
@@ -63,6 +63,9 @@ function Show-Menu {
     $langVal   = if ($cfg.lang)  { $cfg.lang }  else { "?" }
     $notifVal  = if ($cfg.notif -eq "True") { "вкл" } else { "выкл" }
     $postVal   = if ($cfg.post  -eq "False") { "выкл" } else { "вкл" }
+    $modelVal  = if ($cfg.model) { $cfg.model -replace '^ggml-','' } else { "?" }
+    $hkrVal    = if ($cfg.hkr)  { $cfg.hkr }  else { "?" }
+    $hksVal    = if ($cfg.hks)  { $cfg.hks }  else { "?" }
 
     Clear-Host
     Write-Host ""
@@ -89,14 +92,14 @@ function Show-Menu {
     Write-Host ""
     Write-Host " --- Настройки -----------------------------------------------" -ForegroundColor DarkGray
     Write-Host ""
-    Write-Host "  " -NoNewline; Write-Host " 5." -NoNewline -ForegroundColor Yellow; Write-Host " Модели распознавания"
+    Write-Host "  " -NoNewline; Write-Host " 5." -NoNewline -ForegroundColor Yellow; Write-Host " Модели распознавания       " -NoNewline; Write-Host "[$modelVal]" -ForegroundColor Cyan
     Write-Host "     Список моделей — выбрать или скачать и выбрать." -ForegroundColor DarkGray
     Write-Host ""
     Write-Host "  " -NoNewline; Write-Host " 6." -NoNewline -ForegroundColor Yellow; Write-Host " Подбор свободной горячей клавиши"
     Write-Host "     Протестировать F-клавиши и записать в config.yaml." -ForegroundColor DarkGray
     Write-Host ""
-    Write-Host "  " -NoNewline; Write-Host " 7." -NoNewline -ForegroundColor Yellow; Write-Host " Горячая клавиша записи"
-    Write-Host "  " -NoNewline; Write-Host " 8." -NoNewline -ForegroundColor Yellow; Write-Host " Горячая клавиша стопа"
+    Write-Host "  " -NoNewline; Write-Host " 7." -NoNewline -ForegroundColor Yellow; Write-Host " Горячая клавиша записи     " -NoNewline; Write-Host "[$hkrVal]" -ForegroundColor Cyan
+    Write-Host "  " -NoNewline; Write-Host " 8." -NoNewline -ForegroundColor Yellow; Write-Host " Горячая клавиша стопа      " -NoNewline; Write-Host "[$hksVal]" -ForegroundColor Cyan
     Write-Host "  " -NoNewline; Write-Host " 9." -NoNewline -ForegroundColor Yellow; Write-Host " Язык распознавания         " -NoNewline; Write-Host "[$langVal]" -ForegroundColor Cyan
     Write-Host "  " -NoNewline; Write-Host "10." -NoNewline -ForegroundColor Yellow; Write-Host " Устройство ввода (микрофон)"
     Write-Host "  " -NoNewline; Write-Host "11." -NoNewline -ForegroundColor Yellow; Write-Host " Удалить установку"
