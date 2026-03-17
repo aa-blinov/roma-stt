@@ -187,6 +187,7 @@ def build(arch: str = "cpu") -> tuple[bool, str]:
 
     if _compiler_in_path():
         # A: already in Developer Prompt — Ninja is fastest
+        print("  [build] Strategy A: cl.exe in PATH, using Ninja")
         ok, out = run(base_cmake + ["-G", "Ninja", "-DCMAKE_BUILD_TYPE=Release"],
                       cwd=WHISPER_DIR, capture=True)
         if not ok:
@@ -197,6 +198,7 @@ def build(arch: str = "cpu") -> tuple[bool, str]:
         vs_gen = _find_vs_generator()
         if vs_gen:
             # B: VS IDE — multi-config generator, no vcvarsall needed
+            print(f"  [build] Strategy B: VS IDE generator ({vs_gen})")
             ok, out = run(base_cmake + ["-G", vs_gen, "-A", "x64"],
                           cwd=WHISPER_DIR, capture=True)
             if ok:
@@ -204,15 +206,31 @@ def build(arch: str = "cpu") -> tuple[bool, str]:
 
         if not ok:
             # C: Build Tools only — vcvarsall.bat + Ninja (Ninja ships with Build Tools)
-            ok, out = _run_vcvarsall(
-                base_cmake + ["-G", "Ninja", "-DCMAKE_BUILD_TYPE=Release"],
-                cwd=WHISPER_DIR,
-            )
-            if ok:
-                via_vcvarsall = True
+            vcvarsall_path = _find_vcvarsall()
+            if vcvarsall_path:
+                print(f"  [build] Strategy C: vcvarsall.bat found at {vcvarsall_path}, using Ninja")
+                ok, out = _run_vcvarsall(
+                    base_cmake + ["-G", "Ninja", "-DCMAKE_BUILD_TYPE=Release"],
+                    cwd=WHISPER_DIR,
+                )
+                if ok:
+                    via_vcvarsall = True
+            else:
+                print("  [build] Strategy C: vcvarsall.bat NOT found — searching paths:")
+                for base_p in [
+                    Path("C:/Program Files (x86)/Microsoft Visual Studio"),
+                    Path("C:/Program Files/Microsoft Visual Studio"),
+                ]:
+                    print(f"    {base_p} exists={base_p.exists()}")
+                    if base_p.exists():
+                        for year in ["2022", "2019", "2017"]:
+                            for edition in ["BuildTools", "Enterprise", "Professional", "Community"]:
+                                vc = base_p / year / edition / "VC" / "Auxiliary" / "Build" / "vcvarsall.bat"
+                                print(f"      {vc} exists={vc.exists()}")
 
         if not ok:
-            # D: plain run — may work in Dev Prompt that wasn't detected
+            # D: plain run — last resort
+            print("  [build] Strategy D: plain cmake (no MSVC env)")
             ok, out = run(base_cmake, cwd=WHISPER_DIR, capture=True)
             multi_config = ok
 
