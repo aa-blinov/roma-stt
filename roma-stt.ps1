@@ -431,9 +431,13 @@ function Do-ToggleNotifications {
         Write-Host "Сначала выполните 1 (Установка)." -ForegroundColor Red
         Pause-Continue; return
     }
-    $cur = & uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print('включены' if cfg.get('notifications', False) else 'выключены')" 2>$null
-    Write-Host "Сейчас уведомления: " -NoNewline; Write-Host $cur.Trim() -ForegroundColor Cyan
-    & uv run python -c "from infrastructure.config_repo import load_config, save_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); cfg['notifications']=not cfg.get('notifications', False); save_config(p,cfg); print('Уведомления теперь:', 'включены' if cfg['notifications'] else 'выключены')"
+    $curVal = Get-Config "notifications" "False"
+    $cur = if ($curVal -eq "True") { "включены" } else { "выключены" }
+    Write-Host "Сейчас уведомления: " -NoNewline; Write-Host $cur -ForegroundColor Cyan
+    & uv run python -c "from infrastructure.config_repo import load_config, save_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); cfg['notifications']=not cfg.get('notifications', False); save_config(p,cfg)" 2>$null
+    $newVal = Get-Config "notifications" "False"
+    $new = if ($newVal -eq "True") { "включены" } else { "выключены" }
+    Write-Host "Уведомления теперь: $new" -ForegroundColor Green
     Pause-Continue
 }
 
@@ -443,10 +447,14 @@ function Do-TogglePostprocess {
         Write-Host "Сначала выполните 1 (Установка)." -ForegroundColor Red
         Pause-Continue; return
     }
-    $cur = & uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print('включена' if cfg.get('postprocess', True) else 'выключена')" 2>$null
-    Write-Host "Сейчас постобработка: " -NoNewline; Write-Host $cur.Trim() -ForegroundColor Cyan
+    $curVal = Get-Config "postprocess" "True"
+    $cur = if ($curVal -ne "False") { "включена" } else { "выключена" }
+    Write-Host "Сейчас постобработка: " -NoNewline; Write-Host $cur -ForegroundColor Cyan
     Write-Host "Что делает: заглавная буква, точка в конце, удаление [BLANK_AUDIO] и других артефактов Whisper."
-    & uv run python -c "from infrastructure.config_repo import load_config, save_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); cfg['postprocess']=not cfg.get('postprocess', True); save_config(p,cfg); print('Постобработка теперь:', 'включена' if cfg['postprocess'] else 'выключена')"
+    & uv run python -c "from infrastructure.config_repo import load_config, save_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); cfg['postprocess']=not cfg.get('postprocess', True); save_config(p,cfg)" 2>$null
+    $newVal = Get-Config "postprocess" "True"
+    $new = if ($newVal -ne "False") { "включена" } else { "выключена" }
+    Write-Host "Постобработка теперь: $new" -ForegroundColor Green
     Pause-Continue
 }
 
