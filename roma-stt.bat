@@ -408,24 +408,24 @@ set gpu_nvidia=0
 set gpu_amd=0
 set "gpu_nvidia_name=NVIDIA"
 set "gpu_amd_name=AMD/Radeon"
-for /f "skip=1 tokens=*" %%G in ('wmic path win32_VideoController get name 2^>nul') do (
+for /f "tokens=2 delims==" %%G in ('wmic path win32_VideoController get name /format:value 2^>nul') do (
     set "gpuline=%%G"
-    if not "!gpuline: =!"=="" (
-        echo %%G | findstr /i "NVIDIA" >nul
+    if not "!gpuline!"=="" (
+        echo !gpuline! | findstr /i "NVIDIA" >nul
         if not errorlevel 1 (
             set gpu_nvidia=1
-            set "gpu_nvidia_name=%%G"
+            set "gpu_nvidia_name=!gpuline!"
         )
-        echo %%G | findstr /i "Radeon" >nul
+        echo !gpuline! | findstr /i "Radeon" >nul
         if not errorlevel 1 (
             set gpu_amd=1
-            set "gpu_amd_name=%%G"
+            set "gpu_amd_name=!gpuline!"
         )
         if "!gpu_amd!"=="0" (
-            echo %%G | findstr /i "AMD" >nul
+            echo !gpuline! | findstr /i "AMD" >nul
             if not errorlevel 1 (
                 set gpu_amd=1
-                set "gpu_amd_name=%%G"
+                set "gpu_amd_name=!gpuline!"
             )
         )
     )
