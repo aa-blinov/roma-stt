@@ -49,7 +49,21 @@ function Detect-Gpu {
 # Menu
 # ---------------------------------------------------------------------------
 
+function Get-MenuConfig {
+    # Одним вызовом Python читаем все нужные для меню значения
+    if (-not (Test-Path ".venv")) { return @{ lang = ""; notif = ""; post = "" } }
+    $raw = & uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print(cfg.get('language','ru'), cfg.get('notifications', False), cfg.get('postprocess', True), sep='|')" 2>$null
+    if (-not $raw) { return @{ lang = "ru"; notif = "False"; post = "True" } }
+    $parts = $raw.Trim().Split('|')
+    return @{ lang = $parts[0]; notif = $parts[1]; post = $parts[2] }
+}
+
 function Show-Menu {
+    $cfg = Get-MenuConfig
+    $langVal   = if ($cfg.lang)  { $cfg.lang }  else { "?" }
+    $notifVal  = if ($cfg.notif -eq "True") { "вкл" } else { "выкл" }
+    $postVal   = if ($cfg.post  -eq "False") { "выкл" } else { "вкл" }
+
     Clear-Host
     Write-Host ""
     Write-Host " ============================================================" -ForegroundColor DarkGray
@@ -83,11 +97,11 @@ function Show-Menu {
     Write-Host ""
     Write-Host "  " -NoNewline; Write-Host " 7." -NoNewline -ForegroundColor Yellow; Write-Host " Горячая клавиша записи"
     Write-Host "  " -NoNewline; Write-Host " 8." -NoNewline -ForegroundColor Yellow; Write-Host " Горячая клавиша стопа"
-    Write-Host "  " -NoNewline; Write-Host " 9." -NoNewline -ForegroundColor Yellow; Write-Host " Выбрать язык (ru/en/...)"
+    Write-Host "  " -NoNewline; Write-Host " 9." -NoNewline -ForegroundColor Yellow; Write-Host " Язык распознавания         " -NoNewline; Write-Host "[$langVal]" -ForegroundColor Cyan
     Write-Host "  " -NoNewline; Write-Host "10." -NoNewline -ForegroundColor Yellow; Write-Host " Устройство ввода (микрофон)"
     Write-Host "  " -NoNewline; Write-Host "11." -NoNewline -ForegroundColor Yellow; Write-Host " Удалить установку"
-    Write-Host "  " -NoNewline; Write-Host "12." -NoNewline -ForegroundColor Yellow; Write-Host " Уведомления Windows        (по умолчанию выключены)"
-    Write-Host "  " -NoNewline; Write-Host "13." -NoNewline -ForegroundColor Yellow; Write-Host " Постобработка текста       (по умолчанию включена)"
+    Write-Host "  " -NoNewline; Write-Host "12." -NoNewline -ForegroundColor Yellow; Write-Host " Уведомления Windows        " -NoNewline; Write-Host "[$notifVal]" -ForegroundColor Cyan
+    Write-Host "  " -NoNewline; Write-Host "13." -NoNewline -ForegroundColor Yellow; Write-Host " Постобработка текста       " -NoNewline; Write-Host "[$postVal]"  -ForegroundColor Cyan
     Write-Host ""
     Write-Host "  " -NoNewline; Write-Host "14." -NoNewline -ForegroundColor Yellow; Write-Host " Выход"
     Write-Host ""
