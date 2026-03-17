@@ -33,10 +33,22 @@ def _draw_placeholder_icon(size: int = 64) -> Image.Image:
 
 
 def _load_icon_image(icon_path: Path, size: int = 64) -> Image.Image:
-    """Load tray icon from file. Supports .svg (via cairosvg, если установлен), .ico, .png."""
+    """Load tray icon from file.
+
+    Priority for .svg input:
+      1. tray_icon.png / tray_icon.ico alongside the SVG (no extra deps)
+      2. cairosvg — only if installed and .png/.ico are absent
+      3. Placeholder icon drawn with Pillow
+    """
     if not icon_path.exists():
         return _draw_placeholder_icon(size)
     if icon_path.suffix.lower() == ".svg":
+        # 1. Prefer pre-rendered PNG/ICO — no cairosvg needed
+        for ext in (".png", ".ico"):
+            fallback = icon_path.with_suffix(ext)
+            if fallback.exists():
+                return Image.open(fallback).convert("RGBA")
+        # 2. Try cairosvg if available
         try:
             import cairosvg
 
@@ -44,11 +56,6 @@ def _load_icon_image(icon_path: Path, size: int = 64) -> Image.Image:
             return Image.open(io.BytesIO(png_bytes)).convert("RGBA")
         except Exception:
             pass
-        # Нет cairosvg или ошибка — пробуем .ico / .png, иначе рисуем иконку
-        for ext in (".ico", ".png"):
-            fallback = icon_path.with_suffix(ext)
-            if fallback.exists():
-                return Image.open(fallback).convert("RGBA")
         return _draw_placeholder_icon(size)
     return Image.open(icon_path).convert("RGBA")
 
