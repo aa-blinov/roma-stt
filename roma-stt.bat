@@ -109,7 +109,6 @@ echo   !CW!Первый запуск: 1 → 2 → 3!C0!
 echo.
 echo   !CW! 1.!C0! Установка
 echo      Один раз: uv, Git, CMake, VS Build Tools, среда, модель, whisper.cpp.
-echo      !CD!Первый раз может потребоваться запуск от имени администратора.!C0!
 echo.
 echo   !CW! 2.!C0! Проверка готовности
 echo      Убедиться, что всё установлено. После пункта 1.
@@ -162,7 +161,7 @@ echo !CY![1]!C0! Установка...
 uv --version >nul 2>&1
 if errorlevel 1 (
     echo Устанавливаю системные программы (uv, Git, CMake, VS Build Tools)...
-    echo !CD!Если установка не начинается — перезапустите от имени администратора.!C0!
+    echo !CD!Установка через winget (не требует прав администратора).!C0!
     call scripts\install_tools.bat
     uv --version >nul 2>&1
     if errorlevel 1 (
