@@ -25,8 +25,16 @@ class WhisperCppEngine:
             creationflags=subprocess.CREATE_NO_WINDOW,
         )
 
-    def transcribe(self, audio_path: str, language: str = "ru", n_gpu_layers: int = 0) -> str:
-        """Run whisper.cpp: -m model -f audio.wav -nt -l lang [-ngl N], return stdout as text.
+    def transcribe(
+        self,
+        audio_path: str,
+        language: str = "ru",
+        n_gpu_layers: int = 0,
+        beam_size: int = 5,
+        best_of: int = 5,
+        prompt: str = "",
+    ) -> str:
+        """Run whisper.cpp: -m model -f audio.wav -nt -l lang [options], return stdout as text.
         If the binary does not support -ngl (e.g. CPU-only build), retries without -ngl."""
         audio = Path(audio_path).resolve()
         base_args = [
@@ -38,7 +46,13 @@ class WhisperCppEngine:
             "-nt",
             "-l",
             language,
+            "-bs",
+            str(beam_size),
+            "-bo",
+            str(best_of),
         ]
+        if prompt:
+            base_args += ["--prompt", prompt]
         args_with_gpu = base_args + ["-ngl", str(n_gpu_layers)] if n_gpu_layers > 0 else base_args
 
         def is_ngl_unsupported(stderr: str) -> bool:

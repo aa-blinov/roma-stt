@@ -17,6 +17,7 @@ from domain.config_validation import validate_model_path
 from infrastructure.clipboard_paste import paste_text
 from infrastructure.config_repo import load_config, save_config
 from infrastructure.recorder import record_to_wav_until_stopped
+from infrastructure.text_postprocess import postprocess
 from infrastructure.whisper_cpp_engine import WhisperCppEngine
 from presentation.hotkey import parse_hotkey, register_hotkey
 from presentation.tray_app import create_tray_icon
@@ -302,8 +303,20 @@ def main() -> None:
             try:
                 lang = config.get("language", "ru")
                 gpu_layers = 99 if module != "cpu" else 0
+                beam_size = int(config.get("whisper_beam_size", 5))
+                best_of = int(config.get("whisper_best_of", 5))
+                prompt = config.get("whisper_prompt", "") or ""
                 logger.info("transcribe start | lang=%s module=%s gpu_layers=%s wav=%s", lang, module, gpu_layers, wav_path)
-                text = engine.transcribe(wav_path, language=lang, n_gpu_layers=gpu_layers)
+                text = engine.transcribe(
+                    wav_path,
+                    language=lang,
+                    n_gpu_layers=gpu_layers,
+                    beam_size=beam_size,
+                    best_of=best_of,
+                    prompt=prompt,
+                )
+                if config.get("postprocess", True):
+                    text = postprocess(text)
                 length = len(text) if text else 0
                 preview = (text[:80] + "…") if text and len(text) > 80 else (text or "")
                 logger.info("transcribe done | length=%d preview=%r", length, preview)

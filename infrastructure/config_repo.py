@@ -17,6 +17,12 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "input_device": None,       # None = системный по умолчанию, иначе PortAudio-индекс
     "input_device_name": None,  # имя устройства — для поиска при смене индекса
     "notifications": False,     # всплывающие уведомления Windows (по умолчанию выключены)
+    # Whisper параметры качества
+    "whisper_beam_size": 5,     # -bs: сколько вариантов beam search (больше = точнее, медленнее)
+    "whisper_best_of": 5,       # -bo: сколько кандидатов сравнивать (для non-greedy)
+    "whisper_prompt": "",       # --prompt: подсказка модели (имена, термины, стиль речи)
+    # Постобработка
+    "postprocess": True,        # заглавная буква, точка в конце, удаление артефактов whisper
 }
 
 
