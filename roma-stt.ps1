@@ -99,12 +99,19 @@ function Show-Menu {
     Write-Host "     Протестировать F-клавиши и записать в config.yaml." -ForegroundColor DarkGray
     Write-Host ""
     Write-Host "  " -NoNewline; Write-Host " 7." -NoNewline -ForegroundColor Yellow; Write-Host " Горячая клавиша записи     " -NoNewline; Write-Host "[$hkrVal]" -ForegroundColor Cyan
+    Write-Host "     Клавиша для начала записи голоса." -ForegroundColor DarkGray
     Write-Host "  " -NoNewline; Write-Host " 8." -NoNewline -ForegroundColor Yellow; Write-Host " Горячая клавиша стопа      " -NoNewline; Write-Host "[$hksVal]" -ForegroundColor Cyan
+    Write-Host "     Клавиша для остановки записи." -ForegroundColor DarkGray
     Write-Host "  " -NoNewline; Write-Host " 9." -NoNewline -ForegroundColor Yellow; Write-Host " Язык распознавания         " -NoNewline; Write-Host "[$langVal]" -ForegroundColor Cyan
+    Write-Host "     Код языка ISO 639-1: ru, en, de, fr, es, it, zh..." -ForegroundColor DarkGray
     Write-Host "  " -NoNewline; Write-Host "10." -NoNewline -ForegroundColor Yellow; Write-Host " Устройство ввода (микрофон)"
+    Write-Host "     Выбрать микрофон из списка устройств." -ForegroundColor DarkGray
     Write-Host "  " -NoNewline; Write-Host "11." -NoNewline -ForegroundColor Yellow; Write-Host " Удалить установку"
+    Write-Host "     Удалить .venv и models — для переустановки с нуля." -ForegroundColor DarkGray
     Write-Host "  " -NoNewline; Write-Host "12." -NoNewline -ForegroundColor Yellow; Write-Host " Уведомления Windows        " -NoNewline; Write-Host "[$notifVal]" -ForegroundColor Cyan
+    Write-Host "     Всплывающие уведомления при вставке текста." -ForegroundColor DarkGray
     Write-Host "  " -NoNewline; Write-Host "13." -NoNewline -ForegroundColor Yellow; Write-Host " Постобработка текста       " -NoNewline; Write-Host "[$postVal]"  -ForegroundColor Cyan
+    Write-Host "     Заглавная буква, точка в конце, удаление артефактов Whisper." -ForegroundColor DarkGray
     Write-Host ""
     Write-Host "  " -NoNewline; Write-Host "14." -NoNewline -ForegroundColor Yellow; Write-Host " Выход"
     Write-Host ""
