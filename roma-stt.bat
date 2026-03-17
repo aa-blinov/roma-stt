@@ -200,8 +200,6 @@ if "!arch!"=="3" if "!gpu_amd!"=="0" (
 echo.
 echo Запуск установки (среда, зависимости, сборка whisper [%a%], модель)...
 uv run python scripts\install.py --arch %a%
-echo.
-echo !CG!Готово. Дальше: пункт 2 (Проверка), затем пункт 3 (Запуск).!C0!
 pause
 goto menu
 
@@ -349,7 +347,7 @@ goto menu
 :start
 echo !CY![3]!C0! Запуск службы...
 if not exist .venv (
-    echo !CR!Сначала выполните 1 (Установка), затем 2 (Проверка). Когда в пункте 2 всё будет OK — снова выберите 3.!C0!
+    echo !CR!Сначала выполните 1 (Установка).!C0!
     pause
     goto menu
 )
@@ -358,71 +356,24 @@ if exist .roma-stt.pid (
     pause
     goto menu
 )
-call :detect_gpu
-set "mod="
-if "!gpu_nvidia!"=="0" if "!gpu_amd!"=="0" (
-    echo   !CD!Дискретная видеокарта не обнаружена — запускается CPU-режим.!C0!
-    set mod=cpu
-) else (
-    echo   !CW!1!C0! = cpu  ^(без GPU, всегда работает^)
-    if "!gpu_nvidia!"=="1" echo   !CW!2!C0! = cuda ^(!gpu_nvidia_name!^)
-    if "!gpu_amd!"=="1"    echo   !CW!3!C0! = amd  ^(!gpu_amd_name!^)
-    set "mod_hint=1"
-    if "!gpu_nvidia!"=="1" set "mod_hint=!mod_hint!/2"
-    if "!gpu_amd!"=="1"    set "mod_hint=!mod_hint!/3"
-    set /p mod="Режим (!mod_hint!, Enter — в главное меню): "
-    if "!mod!"=="" goto menu
-    if "!mod!"=="1" set mod=cpu
-    if "!mod!"=="2" set mod=cuda
-    if "!mod!"=="3" set mod=amd
-    if not "!mod!"=="cpu" if not "!mod!"=="cuda" if not "!mod!"=="amd" (
-        echo !CR!Неверный выбор. Введите одну из предложенных цифр.!C0!
-        pause
-        goto start
-    )
-)
-if "!mod!"=="cuda" if "!gpu_nvidia!"=="0" (
-    echo.
-    echo !CR! Выбран CUDA, но видеокарта NVIDIA не обнаружена.!C0!
-    pause
-    goto start
-)
-if "!mod!"=="amd" if "!gpu_amd!"=="0" (
-    echo.
-    echo !CR! Выбран AMD, но видеокарта AMD/Radeon не обнаружена.!C0!
-    pause
-    goto start
-)
+for /f "usebackq tokens=*" %%a in (`uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print(cfg.get('module','cpu'))"`) do set "mod=%%a"
 if not exist "bin\main-!mod!.exe" (
-    echo Бинарник bin\main-!mod!.exe не найден. Запускается сборка whisper.cpp [!mod!]...
-    echo Это займёт несколько минут. Не закрывайте окно.
-    uv run python scripts\build_whisper_cpp.py --arch !mod!
-    if errorlevel 1 (
-        echo.
-        echo !CR!Сборка завершилась с ошибкой. Проверьте зависимости ^(пункт 1^) и повторите.!C0!
-        pause
-        goto menu
-    )
-    echo !CG!Сборка завершена.!C0!
-    set "cfgfile=config.yaml"
-    uv run python -c "from infrastructure.config_repo import load_config, save_config; from pathlib import Path; import sys; p=Path('!cfgfile!'); cfg=load_config(p); cfg['module']=sys.argv[1]; save_config(p,cfg)" "!mod!"
-    goto start_now
+    echo !CR!Бинарник bin\main-!mod!.exe не найден.!C0! Сначала выполните 1 ^(Установка^).
+    pause
+    goto menu
 )
-set "cfgfile=config.yaml"
-uv run python -c "from infrastructure.config_repo import load_config, save_config; from pathlib import Path; import sys; p=Path('!cfgfile!'); cfg=load_config(p); cfg['module']=sys.argv[1]; save_config(p,cfg)" "!mod!"
 uv run python scripts\check_ready.py >nul 2>&1
 if errorlevel 1 (
     echo !CR!Проверка готовности не прошла:!C0!
     uv run python scripts\check_ready.py
     echo.
-    echo Сделайте по порядку: 1 ^(Установка^), потом 2 ^(Проверка^). Когда в пункте 2 будет «Ready» — снова выберите 3.
+    echo Сделайте: 1 ^(Установка^), потом 2 ^(Проверка^). Когда в пункте 2 будет OK — снова выберите 3.
     pause
     goto menu
 )
-:start_now
 for /f "usebackq tokens=*" %%a in (`uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print(cfg.get('hotkey_record', 'Ctrl+F2'))"`) do set "hk_r=%%a"
 for /f "usebackq tokens=*" %%b in (`uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print(cfg.get('hotkey_stop', 'Ctrl+F3'))"`) do set "hk_s=%%b"
-echo !CG!Служба запускается в трее.!C0! Запись: !CY!!hk_r!!C0!, Стоп: !CY!!hk_s!!C0!
+echo !CG!Служба запускается в трее.!C0! Режим: !CY!!mod!!C0!, Запись: !CY!!hk_r!!C0!, Стоп: !CY!!hk_s!!C0!
 echo Остановить: пункт 4. Это окно можно закрыть.
 start "" /B .venv\Scripts\pythonw.exe main.py --module !mod!
 goto menu
