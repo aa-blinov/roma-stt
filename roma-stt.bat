@@ -187,6 +187,7 @@ if "!gpu_nvidia!"=="0" if "!gpu_amd!"=="0" echo   ^(дискретная вид�
 set "arch_hint=1"
 if "!gpu_nvidia!"=="1" set "arch_hint=!arch_hint!/2"
 if "!gpu_amd!"=="1"    set "arch_hint=!arch_hint!/3"
+set "arch="
 set /p arch="Архитектура (!arch_hint!, Enter — в главное меню): "
 if "!arch!"=="" goto menu
 set a=cpu
@@ -342,6 +343,7 @@ if "!gpu_nvidia!"=="0" if "!gpu_amd!"=="0" echo   ^(дискретная вид�
 set "mod_hint=1"
 if "!gpu_nvidia!"=="1" set "mod_hint=!mod_hint!/2"
 if "!gpu_amd!"=="1"    set "mod_hint=!mod_hint!/3"
+set "mod="
 set /p mod="Режим (!mod_hint!, Enter — в главное меню): "
 if "!mod!"=="" goto menu
 if "!mod!"=="1" set mod=cpu
