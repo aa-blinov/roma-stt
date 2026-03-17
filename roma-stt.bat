@@ -179,12 +179,33 @@ if errorlevel 1 (
     pause
     goto menu
 )
-echo   1 = cpu  2 = cuda  3 = amd
+call :detect_gpu
+if "!gpu_nvidia!"=="1" if "!gpu_amd!"=="1" (
+    echo   1 = cpu  2 = cuda ^(NVIDIA^)  3 = amd ^(AMD/Radeon^)
+) else if "!gpu_nvidia!"=="1" (
+    echo   1 = cpu  2 = cuda ^(NVIDIA обнаружена^)
+) else if "!gpu_amd!"=="1" (
+    echo   1 = cpu  3 = amd ^(AMD/Radeon обнаружена^)
+) else (
+    echo   1 = cpu  ^(видеокарта NVIDIA/AMD не обнаружена^)
+)
 set /p arch="Архитектура (1/2/3, Enter — в главное меню): "
 if "!arch!"=="" goto menu
 set a=cpu
 if "!arch!"=="2" set a=cuda
 if "!arch!"=="3" set a=amd
+if "!arch!"=="2" if "!gpu_nvidia!"=="0" (
+    echo.
+    echo  Выбран CUDA, но видеокарта NVIDIA не обнаружена. Используйте cpu ^(1^) или amd ^(3^).
+    pause
+    goto install
+)
+if "!arch!"=="3" if "!gpu_amd!"=="0" (
+    echo.
+    echo  Выбран AMD, но видеокарта AMD/Radeon не обнаружена. Используйте cpu ^(1^) или cuda ^(2^).
+    pause
+    goto install
+)
 echo.
 echo Запуск установки (среда, зависимости, сборка whisper [%a%], модель)...
 uv run python scripts\install.py --arch %a%
@@ -315,12 +336,33 @@ if not exist .venv (
     pause
     goto menu
 )
-echo   1 = cpu  2 = cuda  3 = amd
+call :detect_gpu
+if "!gpu_nvidia!"=="1" if "!gpu_amd!"=="1" (
+    echo   1 = cpu  2 = cuda ^(NVIDIA^)  3 = amd ^(AMD/Radeon^)
+) else if "!gpu_nvidia!"=="1" (
+    echo   1 = cpu  2 = cuda ^(NVIDIA обнаружена^)
+) else if "!gpu_amd!"=="1" (
+    echo   1 = cpu  3 = amd ^(AMD/Radeon обнаружена^)
+) else (
+    echo   1 = cpu  ^(видеокарта NVIDIA/AMD не обнаружена^)
+)
 set /p mod="Режим (1/2/3, Enter — в главное меню): "
 if "!mod!"=="" goto menu
 if "!mod!"=="1" set mod=cpu
 if "!mod!"=="2" set mod=cuda
 if "!mod!"=="3" set mod=amd
+if "!mod!"=="cuda" if "!gpu_nvidia!"=="0" (
+    echo.
+    echo  Выбран CUDA, но видеокарта NVIDIA не обнаружена. Используйте cpu ^(1^) или amd ^(3^).
+    pause
+    goto start
+)
+if "!mod!"=="amd" if "!gpu_amd!"=="0" (
+    echo.
+    echo  Выбран AMD, но видеокарта AMD/Radeon не обнаружена. Используйте cpu ^(1^) или cuda ^(2^).
+    pause
+    goto start
+)
 if not exist "bin\main-!mod!.exe" (
     echo Бинарник bin\main-!mod!.exe не найден. Запускается сборка whisper.cpp [!mod!]...
     echo Это займёт несколько минут. Не закрывайте окно.
@@ -364,3 +406,14 @@ echo Готово.
 echo Если служба не была запущена — ничего страшного. Чтобы начать: сначала 1 ^(Установка^), потом 2 ^(Проверка^), потом 3 ^(Запуск^).
 pause
 goto menu
+
+:detect_gpu
+set gpu_nvidia=0
+set gpu_amd=0
+wmic path win32_VideoController get name 2>nul | findstr /i "NVIDIA" >nul
+if not errorlevel 1 set gpu_nvidia=1
+wmic path win32_VideoController get name 2>nul | findstr /i "AMD" >nul
+if not errorlevel 1 set gpu_amd=1
+wmic path win32_VideoController get name 2>nul | findstr /i "Radeon" >nul
+if not errorlevel 1 set gpu_amd=1
+exit /b 0
