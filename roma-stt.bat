@@ -184,16 +184,20 @@ if errorlevel 1 (
     goto menu
 )
 call :detect_gpu
-echo   1 = cpu  ^(без GPU, всегда работает^)
-if "!gpu_nvidia!"=="1" echo   2 = cuda ^(!gpu_nvidia_name!^)
-if "!gpu_amd!"=="1"    echo   3 = amd  ^(!gpu_amd_name!^)
-if "!gpu_nvidia!"=="0" if "!gpu_amd!"=="0" echo   ^(дискретная видеокарта не обнаружена, доступен только cpu^)
-set "arch_hint=1"
-if "!gpu_nvidia!"=="1" set "arch_hint=!arch_hint!/2"
-if "!gpu_amd!"=="1"    set "arch_hint=!arch_hint!/3"
 set "arch="
-set /p arch="Архитектура (!arch_hint!, Enter — в главное меню): "
-if "!arch!"=="" goto menu
+if "!gpu_nvidia!"=="0" if "!gpu_amd!"=="0" (
+    echo   Дискретная видеокарта не обнаружена — будет установлен CPU-режим.
+    set arch=1
+) else (
+    echo   1 = cpu  ^(без GPU, всегда работает^)
+    if "!gpu_nvidia!"=="1" echo   2 = cuda ^(!gpu_nvidia_name!^)
+    if "!gpu_amd!"=="1"    echo   3 = amd  ^(!gpu_amd_name!^)
+    set "arch_hint=1"
+    if "!gpu_nvidia!"=="1" set "arch_hint=!arch_hint!/2"
+    if "!gpu_amd!"=="1"    set "arch_hint=!arch_hint!/3"
+    set /p arch="Архитектура (!arch_hint!, Enter — в главное меню): "
+    if "!arch!"=="" goto menu
+)
 set a=cpu
 if "!arch!"=="2" set a=cuda
 if "!arch!"=="3" set a=amd
@@ -297,30 +301,32 @@ goto menu
 
 :set_hotkey_record
 echo [7] Горячая клавиша записи...
-echo Примеры: Ctrl+F2, Ctrl+Shift+F12. Enter = Ctrl+F2.
-set /p newrec="Введите строку (Enter = Ctrl+F2): "
-if "!newrec!"=="" set "newrec=Ctrl+F2"
-echo Записываем в config.yaml: hotkey_record: !newrec!
+for /f "usebackq tokens=*" %%a in (`uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print(cfg.get('hotkey_record','Ctrl+F2'))"`) do set "cur_rec=%%a"
+echo Сейчас: !cur_rec!
+echo Примеры: Ctrl+F2, Ctrl+Shift+F12. Enter — оставить текущую.
+set /p newrec="Введите строку (Enter — оставить !cur_rec!): "
+if "!newrec!"=="" goto menu
 uv run python -c "from infrastructure.config_repo import load_config, save_config; from pathlib import Path; import sys; p=Path('config.yaml'); cfg=load_config(p); cfg['hotkey_record']=sys.argv[1]; save_config(p,cfg)" "!newrec!"
-echo Готово.
+echo Готово. Перезапустите службу (пункт 4, затем 3), чтобы изменение вступило в силу.
 pause
 goto menu
 
 :set_hotkey_stop
 echo [8] Горячая клавиша стопа...
-echo Примеры: Ctrl+F3, Ctrl+Shift+F12. Enter = Ctrl+F3.
-set /p newstop="Введите строку (Enter = Ctrl+F3): "
-if "!newstop!"=="" set "newstop=Ctrl+F3"
-echo Записываем в config.yaml: hotkey_stop: !newstop!
+for /f "usebackq tokens=*" %%a in (`uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print(cfg.get('hotkey_stop','Ctrl+F3'))"`) do set "cur_stop=%%a"
+echo Сейчас: !cur_stop!
+echo Примеры: Ctrl+F3, Ctrl+Shift+F12. Enter — оставить текущую.
+set /p newstop="Введите строку (Enter — оставить !cur_stop!): "
+if "!newstop!"=="" goto menu
 uv run python -c "from infrastructure.config_repo import load_config, save_config; from pathlib import Path; import sys; p=Path('config.yaml'); cfg=load_config(p); cfg['hotkey_stop']=sys.argv[1]; save_config(p,cfg)" "!newstop!"
-echo Готово.
+echo Готово. Перезапустите службу (пункт 4, затем 3), чтобы изменение вступило в силу.
 pause
 goto menu
 
 :set_language
 echo [9] Выбрать язык...
-echo Текущий язык: 
-uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print(cfg.get('language', 'ru'))"
+for /f "usebackq tokens=*" %%a in (`uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print(cfg.get('language', 'ru'))"`) do set "cur_lang=%%a"
+echo Текущий язык: !cur_lang!
 echo.
 echo Примеры: ru, en, de, fr, es, it, jp, zh.
 set /p newlang="Введите код языка (Enter — в главное меню): "
@@ -354,19 +360,23 @@ if not exist .venv (
     goto menu
 )
 call :detect_gpu
-echo   1 = cpu  ^(без GPU, всегда работает^)
-if "!gpu_nvidia!"=="1" echo   2 = cuda ^(!gpu_nvidia_name!^)
-if "!gpu_amd!"=="1"    echo   3 = amd  ^(!gpu_amd_name!^)
-if "!gpu_nvidia!"=="0" if "!gpu_amd!"=="0" echo   ^(дискретная видеокарта не обнаружена, доступен только cpu^)
-set "mod_hint=1"
-if "!gpu_nvidia!"=="1" set "mod_hint=!mod_hint!/2"
-if "!gpu_amd!"=="1"    set "mod_hint=!mod_hint!/3"
 set "mod="
-set /p mod="Режим (!mod_hint!, Enter — в главное меню): "
-if "!mod!"=="" goto menu
-if "!mod!"=="1" set mod=cpu
-if "!mod!"=="2" set mod=cuda
-if "!mod!"=="3" set mod=amd
+if "!gpu_nvidia!"=="0" if "!gpu_amd!"=="0" (
+    echo   Дискретная видеокарта не обнаружена — запускается CPU-режим.
+    set mod=cpu
+) else (
+    echo   1 = cpu  ^(без GPU, всегда работает^)
+    if "!gpu_nvidia!"=="1" echo   2 = cuda ^(!gpu_nvidia_name!^)
+    if "!gpu_amd!"=="1"    echo   3 = amd  ^(!gpu_amd_name!^)
+    set "mod_hint=1"
+    if "!gpu_nvidia!"=="1" set "mod_hint=!mod_hint!/2"
+    if "!gpu_amd!"=="1"    set "mod_hint=!mod_hint!/3"
+    set /p mod="Режим (!mod_hint!, Enter — в главное меню): "
+    if "!mod!"=="" goto menu
+    if "!mod!"=="1" set mod=cpu
+    if "!mod!"=="2" set mod=cuda
+    if "!mod!"=="3" set mod=amd
+)
 if "!mod!"=="cuda" if "!gpu_nvidia!"=="0" (
     echo.
     echo  Выбран CUDA, но видеокарта NVIDIA не обнаружена.
@@ -409,10 +419,8 @@ if errorlevel 1 (
 for /f "usebackq tokens=*" %%a in (`uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print(cfg.get('hotkey_record', 'Ctrl+F2'))"`) do set "hk_r=%%a"
 for /f "usebackq tokens=*" %%b in (`uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print(cfg.get('hotkey_stop', 'Ctrl+F3'))"`) do set "hk_s=%%b"
 echo Служба запускается в трее. Запись: !hk_r!, Стоп: !hk_s!
-echo Это окно можно закрыть — служба продолжит работать в трее.
-echo Остановить: пункт 4.
+echo Остановить: пункт 4. Это окно можно закрыть.
 start "" /B .venv\Scripts\pythonw.exe main.py --module !mod!
-pause
 goto menu
 
 :stop
