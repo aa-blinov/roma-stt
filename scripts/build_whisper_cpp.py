@@ -13,9 +13,45 @@ REPO_URL = "https://github.com/ggml-org/whisper.cpp.git"
 
 _VSWHERE = Path("C:/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe")
 
+_VS_GEN_MAP = {
+    "17": "Visual Studio 17 2022",
+    "16": "Visual Studio 16 2019",
+    "15": "Visual Studio 15 2017",
+}
+
+
+def _find_vs_generator() -> str | None:
+    """Detect cmake Visual Studio generator for installed VS or Build Tools.
+
+    Using the VS generator is more robust than vcvarsall: cmake finds the
+    compiler through the Windows registry without needing a Developer Prompt.
+    Tries with C++ component requirement first, then any install as fallback.
+    """
+    if not _VSWHERE.exists():
+        return None
+    for extra in (
+        ["-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64"],
+        [],  # fallback: any VS/Build Tools installation
+    ):
+        try:
+            r = subprocess.run(
+                [str(_VSWHERE), "-latest", "-products", "*",
+                 *extra, "-property", "installationVersion"],
+                capture_output=True, text=True, timeout=15,
+            )
+            version = r.stdout.strip()
+            if version:
+                major = version.split(".")[0]
+                gen = _VS_GEN_MAP.get(major)
+                if gen:
+                    return gen
+        except Exception:
+            pass
+    return None
+
 
 def _find_vcvarsall() -> Path | None:
-    """Find vcvarsall.bat for the latest VS installation via vswhere."""
+    """Find vcvarsall.bat (fallback for when VS generator is unavailable)."""
     if not _VSWHERE.exists():
         return None
     try:
@@ -51,24 +87,19 @@ def run(cmd: list[str], cwd: Path, capture: bool = False) -> tuple[bool, str]:
 
 
 def run_msvc(cmd: list[str], cwd: Path) -> tuple[bool, str]:
-    """Run cmd with MSVC environment initialized (vcvarsall x64), or plain if already set."""
+    """Run cmd with MSVC environment (vcvarsall x64 fallback). Used only when VS generator unavailable."""
     if _compiler_in_path():
         return run(cmd, cwd, capture=True)
 
     vcvarsall = _find_vcvarsall()
     if vcvarsall:
-        # Wrap: call vcvarsall to set MSVC env, then run our command
         wrapped = f'call "{vcvarsall}" x64 2>&1 && {subprocess.list2cmdline(cmd)}'
         r = subprocess.run(
             ["cmd", "/c", wrapped],
-            cwd=cwd,
-            capture_output=True,
-            text=True,
-            timeout=600,
+            cwd=cwd, capture_output=True, text=True, timeout=600,
         )
         return r.returncode == 0, (r.stdout or "") + (r.stderr or "")
 
-    # No vcvarsall found — try plain (may fail with compiler errors)
     return run(cmd, cwd, capture=True)
 
 
@@ -132,7 +163,14 @@ def build(arch: str = "cpu") -> tuple[bool, str]:
     elif arch == "amd":
         cmake_args.append("-DGGML_VULKAN=ON")
 
-    ok, out = run_msvc(cmake_args, cwd=WHISPER_DIR)
+    # Prefer VS generator: cmake resolves MSVC from Windows registry — no vcvarsall needed.
+    # Fallback: vcvarsall wrapping or plain run (Developer Command Prompt).
+    vs_gen = _find_vs_generator()
+    if vs_gen:
+        cmake_args += ["-G", vs_gen, "-A", "x64"]
+        ok, out = run(cmake_args, cwd=WHISPER_DIR, capture=True)
+    else:
+        ok, out = run_msvc(cmake_args, cwd=WHISPER_DIR)
     if not ok:
         hint = _no_compiler_hint()
         if arch == "cuda" and ("nvcc" in out or "CUDA Toolkit" in out or "CUDAToolkit" in out):
