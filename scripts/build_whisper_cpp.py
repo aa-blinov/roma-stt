@@ -114,10 +114,16 @@ def _no_compiler_hint() -> str:
 
 
 def build(arch: str = "cpu") -> tuple[bool, str]:
+    build_dir = WHISPER_DIR / f"build-{arch}"
+    # Clean stale build dir if previous configure failed (no cmake.check_cache_file = broken cache)
+    if build_dir.exists() and not (build_dir / "CMakeFiles" / "cmake.check_cache_file").exists():
+        print(f"Removing stale build cache for {arch}...")
+        shutil.rmtree(build_dir, ignore_errors=True)
+
     print(f"Configuring whisper.cpp (cmake) for {arch}...")
     cmake_args = [
         "cmake",
-        "-B", "build",
+        "-B", f"build-{arch}",
         "-DWHISPER_BUILD_EXAMPLES=ON",
         "-DWHISPER_BUILD_TESTS=OFF",
     ]
@@ -143,11 +149,16 @@ def build(arch: str = "cpu") -> tuple[bool, str]:
                 "Или: winget install KhronosGroup.VulkanSDK\n"
                 "После установки перезапустите консоль."
             )
+        if "nmake" in out.lower() or "CMAKE_C_COMPILER not set" in out:
+            hint += (
+                "\n\nЕсли ошибка повторяется — удалите папку whisper.cpp\\build вручную "
+                "и запустите сборку снова."
+            )
         return False, f"cmake configure failed: {out}{hint}"
 
     print(f"Building whisper.cpp (Release) for {arch}...")
     ok, out = run_msvc(
-        ["cmake", "--build", "build", "--config", "Release", "-j"],
+        ["cmake", "--build", f"build-{arch}", "--config", "Release", "-j"],
         cwd=WHISPER_DIR,
     )
     if not ok:
@@ -159,7 +170,7 @@ def build(arch: str = "cpu") -> tuple[bool, str]:
 
 
 def copy_to_bin(arch: str = "cpu") -> tuple[bool, str]:
-    release = WHISPER_DIR / "build" / "bin" / "Release"
+    release = WHISPER_DIR / f"build-{arch}" / "bin" / "Release"
     cli_exe = release / "whisper-cli.exe"
     if not cli_exe.exists():
         return False, f"Build artifact not found: {cli_exe}"
