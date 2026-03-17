@@ -22,7 +22,7 @@ if errorlevel 1 (
 )
 echo winget найден, проверяю остальное...
 echo.
-set /p go="Продолжить? (Enter — в главное меню): "
+set /p go="Продолжить установку? (y — да, Enter — в главное меню): "
 if "!go!"=="" exit /b 0
 echo.
 set need_uv=1
@@ -97,25 +97,68 @@ if not defined vs_installed (
 )
 echo.
 
-set need_cuda=1
-where nvcc >nul 2>&1
-if not errorlevel 1 (
-    echo CUDA Toolkit ^(nvcc^) уже найден в PATH.
-    set need_cuda=0
-)
-if "!need_cuda!"=="1" (
-    echo CUDA Toolkit ^(для сборки под видеокарту NVIDIA^) — большой пакет ^(~3 ГБ^).
-    set /p cuda="Установить сейчас? (y/N): "
-    if /i "!cuda!"=="y" (
-        echo Устанавливаю NVIDIA CUDA Toolkit ^(winget install -e --id Nvidia.CUDA^)...
-        echo Внимание: установка может предложить перезагрузку Windows — можно отложить.
-        winget install -e --id Nvidia.CUDA --accept-package-agreements --accept-source-agreements --silent
-        echo После установки закройте это окно, откройте консоль заново и запустите пункт 1 или build-whisper с архитектурой cuda.
-    ) else (
-        echo Поставьте потом: winget install -e --id Nvidia.CUDA или https://developer.nvidia.com/cuda-downloads
-    )
+echo Определяю видеокарту...
+set gpu_nvidia=0
+set gpu_amd=0
+wmic path win32_VideoController get name 2>nul | findstr /i "NVIDIA" >nul
+if not errorlevel 1 set gpu_nvidia=1
+wmic path win32_VideoController get name 2>nul | findstr /i "AMD" >nul
+if not errorlevel 1 set gpu_amd=1
+wmic path win32_VideoController get name 2>nul | findstr /i "Radeon" >nul
+if not errorlevel 1 set gpu_amd=1
+echo.
+if "!gpu_nvidia!"=="1" echo   Обнаружена видеокарта NVIDIA.
+if "!gpu_amd!"=="1"    echo   Обнаружена видеокарта AMD ^(Radeon^).
+if "!gpu_nvidia!"=="0" if "!gpu_amd!"=="0" (
+    echo   Дискретная видеокарта NVIDIA или AMD не обнаружена. Будет использоваться CPU.
 )
 echo.
+
+if "!gpu_nvidia!"=="1" (
+    set need_cuda=1
+    where nvcc >nul 2>&1
+    if not errorlevel 1 (
+        echo CUDA Toolkit ^(nvcc^) уже найден в PATH.
+        set need_cuda=0
+    )
+    if "!need_cuda!"=="1" (
+        echo CUDA Toolkit ускорит распознавание речи на NVIDIA. Большой пакет ^(~3 ГБ^).
+        echo Если достаточно CPU — отвечайте N.
+        set /p cuda="Установить CUDA Toolkit? (y/N): "
+        if /i "!cuda!"=="y" (
+            echo Устанавливаю NVIDIA CUDA Toolkit...
+            echo Внимание: установка может предложить перезагрузку Windows — можно отложить.
+            winget install -e --id Nvidia.CUDA --accept-package-agreements --accept-source-agreements --silent
+            echo После установки закройте это окно, откройте консоль заново и запустите пункт 1.
+        ) else (
+            echo Пропущено. При запуске выберите режим cpu ^(пункт 3 -^> 1^).
+        )
+    )
+    echo.
+)
+
+if "!gpu_amd!"=="1" (
+    set need_vulkan=1
+    where vulkaninfo >nul 2>&1
+    if not errorlevel 1 (
+        echo Vulkan SDK уже найден в PATH.
+        set need_vulkan=0
+    )
+    if "!need_vulkan!"=="1" (
+        echo Vulkan SDK ускорит распознавание речи на AMD. ~200 МБ.
+        echo Если достаточно CPU — отвечайте N.
+        set /p vulkan="Установить Vulkan SDK? (y/N): "
+        if /i "!vulkan!"=="y" (
+            echo Устанавливаю Vulkan SDK ^(KhronosGroup.VulkanSDK^)...
+            winget install --id KhronosGroup.VulkanSDK --accept-package-agreements --accept-source-agreements
+            echo После установки закройте это окно, откройте консоль заново и запустите пункт 1.
+        ) else (
+            echo Пропущено. При запуске выберите режим cpu ^(пункт 3 -^> 1^).
+        )
+    )
+    echo.
+)
+
 echo После установки закройте окно, откройте папку снова и запустите roma-stt.bat.
 echo Дальше: пункт 1 ^(Установка^), 2 ^(Проверка^), 3 ^(Запуск^).
 exit /b 0

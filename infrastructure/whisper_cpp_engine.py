@@ -42,7 +42,9 @@ class WhisperCppEngine:
 
         def is_ngl_unsupported(stderr: str) -> bool:
             s = (stderr or "").lower()
-            return ("-ngl" in s or "ngl" in s) and "unknown" in s
+            return ("ngl" in s or "n-gpu-layers" in s or "gpu" in s) and (
+                "unknown" in s or "invalid" in s or "unrecognized" in s
+            )
 
         result = self._run_whisper(args_with_gpu)
         used_ngl = n_gpu_layers > 0
