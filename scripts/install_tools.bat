@@ -139,19 +139,35 @@ if "!gpu_nvidia!"=="1" (
 
 if "!gpu_amd!"=="1" (
     set need_vulkan=1
-    where vulkaninfo >nul 2>&1
+    rem Check for actual LunarG SDK (not just runtime from GPU driver)
+    rem glslc.exe is only present in the full SDK, not in driver-bundled runtime
+    where glslc >nul 2>&1
     if not errorlevel 1 (
-        echo Vulkan SDK уже найден в PATH.
+        echo Vulkan SDK ^(LunarG^) уже установлен ^(glslc найден^).
         set need_vulkan=0
+    )
+    if "!need_vulkan!"=="1" (
+        if defined VULKAN_SDK (
+            if exist "!VULKAN_SDK!\Lib\vulkan-1.lib" (
+                echo Vulkan SDK уже установлен ^(VULKAN_SDK=!VULKAN_SDK!^).
+                set need_vulkan=0
+            )
+        )
+    )
+    if "!need_vulkan!"=="1" (
+        if exist "C:\VulkanSDK" (
+            echo Vulkan SDK найден в C:\VulkanSDK.
+            set need_vulkan=0
+        )
     )
     if "!need_vulkan!"=="1" (
         echo Vulkan SDK ускорит распознавание речи на AMD. ~200 МБ.
         echo Если достаточно CPU — отвечайте N.
-        set /p vulkan="Установить Vulkan SDK? (y/N): "
+        set /p vulkan="Установить Vulkan SDK? (y — да, Enter — пропустить): "
         if /i "!vulkan!"=="y" (
             echo Устанавливаю Vulkan SDK ^(KhronosGroup.VulkanSDK^)...
             winget install --id KhronosGroup.VulkanSDK --accept-package-agreements --accept-source-agreements
-            echo После установки закройте это окно, откройте консоль заново и запустите пункт 1.
+            echo После установки закройте это окно, откройте консоль заново и запустите пункт 3.
         ) else (
             echo Пропущено. При запуске выберите режим cpu ^(пункт 3 -^> 1^).
         )

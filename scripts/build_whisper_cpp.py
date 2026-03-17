@@ -13,6 +13,27 @@ REPO_URL = "https://github.com/ggml-org/whisper.cpp.git"
 
 _VSWHERE = Path("C:/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe")
 
+
+def _find_vulkan_sdk() -> str | None:
+    """Return Vulkan SDK root (the one with Lib/vulkan-1.lib), or None."""
+    # 1. VULKAN_SDK env var (set by LunarG installer)
+    sdk = os.environ.get("VULKAN_SDK", "").strip()
+    if sdk and (Path(sdk) / "Lib" / "vulkan-1.lib").exists():
+        return sdk
+
+    # 2. Scan C:/VulkanSDK/<version>/ — installed but env var not in this shell
+    for base in [Path("C:/VulkanSDK"), Path("C:/vulkansdk")]:
+        if not base.exists():
+            continue
+        candidates = sorted(
+            (p for p in base.iterdir() if p.is_dir() and (p / "Lib" / "vulkan-1.lib").exists()),
+            key=lambda p: p.name,
+            reverse=True,
+        )
+        if candidates:
+            return str(candidates[0])
+    return None
+
 _VS_GEN_MAP = {
     "17": "Visual Studio 17 2022",
     "16": "Visual Studio 16 2019",
@@ -201,6 +222,14 @@ def build(arch: str = "cpu") -> tuple[bool, str]:
         base_cmake.append("-DGGML_CUDA=ON")
     elif arch == "amd":
         base_cmake.append("-DGGML_VULKAN=ON")
+        # Pass Vulkan SDK path explicitly so cmake finds it even if VULKAN_SDK env
+        # var is not set in the current shell (common after fresh SDK install)
+        vulkan_sdk = _find_vulkan_sdk()
+        if vulkan_sdk:
+            print(f"  [amd] Vulkan SDK found at: {vulkan_sdk}")
+            base_cmake.append(f"-DVULKAN_SDK={vulkan_sdk}")
+        else:
+            print("  [amd] Vulkan SDK NOT found — install via step 0 or: winget install KhronosGroup.VulkanSDK")
 
     # Build strategy (tried in order):
     # A. cl.exe in PATH (Developer Command Prompt) → Ninja, single-config
