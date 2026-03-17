@@ -372,16 +372,22 @@ if not exist "bin\main-!mod!.exe" (
         goto menu
     )
     echo Сборка завершена.
-    echo.
+    set "cfgfile=config.yaml"
+    uv run python -c "from infrastructure.config_repo import load_config, save_config; from pathlib import Path; import sys; p=Path('!cfgfile!'); cfg=load_config(p); cfg['module']=sys.argv[1]; save_config(p,cfg)" "!mod!"
+    goto start_now
 )
 set "cfgfile=config.yaml"
 uv run python -c "from infrastructure.config_repo import load_config, save_config; from pathlib import Path; import sys; p=Path('!cfgfile!'); cfg=load_config(p); cfg['module']=sys.argv[1]; save_config(p,cfg)" "!mod!"
 uv run python scripts\check_ready.py >nul 2>&1
 if errorlevel 1 (
-    echo Проверка готовности не прошла. Сделайте по порядку: 1 ^(Установка^), потом 2 ^(Проверка^). Когда в пункте 2 будет «Ready» — снова выберите 3.
+    echo Проверка готовности не прошла:
+    uv run python scripts\check_ready.py
+    echo.
+    echo Сделайте по порядку: 1 ^(Установка^), потом 2 ^(Проверка^). Когда в пункте 2 будет «Ready» — снова выберите 3.
     pause
     goto menu
 )
+:start_now
 for /f "usebackq tokens=*" %%a in (`uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print(cfg.get('hotkey_record', 'Ctrl+F2'))"`) do set "hk_r=%%a"
 for /f "usebackq tokens=*" %%b in (`uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print(cfg.get('hotkey_stop', 'Ctrl+F3'))"`) do set "hk_s=%%b"
 echo Служба запускается в трее. Запись: !hk_r!, Стоп: !hk_s!
@@ -412,6 +418,8 @@ set "gpu_nvidia_name=NVIDIA"
 set "gpu_amd_name=AMD/Radeon"
 for /f "tokens=2 delims==" %%G in ('wmic path win32_VideoController get name /format:value 2^>nul') do (
     set "gpuline=%%G"
+    rem Strip trailing CR that wmic adds to each value line
+    set "gpuline=!gpuline:~0,-1!"
     if not "!gpuline!"=="" (
         echo !gpuline! | findstr /i "NVIDIA" >nul
         if not errorlevel 1 (

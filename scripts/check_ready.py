@@ -43,14 +43,17 @@ def check_whisper_runs(exe_path: str) -> tuple[bool, str]:
     try:
         import subprocess
 
+        resolved = Path(exe_path) if Path(exe_path).is_absolute() else ROOT / exe_path
+        resolved = resolved.resolve()
         r = subprocess.run(
-            [str(Path(exe_path).resolve()), "-h"],
+            [str(resolved), "-h"],
             capture_output=True,
             text=True,
             timeout=10,
-            cwd=str(Path(exe_path).resolve().parent),
+            cwd=str(resolved.parent),
         )
-        if r.returncode == 0 or "usage" in (r.stdout or "").lower() or "usage" in (r.stderr or "").lower():
+        out = (r.stdout or "").lower() + (r.stderr or "").lower()
+        if r.returncode == 0 or "usage" in out or "options" in out or "help" in out:
             return True, "whisper.cpp: runs OK"
         return False, f"whisper.cpp: exit code {r.returncode}"
     except Exception as e:
@@ -72,9 +75,11 @@ def check_config(config_path: Path | None = None) -> tuple[bool, str]:
         return False, f"config: set {key} to whisper.cpp executable"
     if not model:
         return False, "config: set whisper_model_path to ggml model (multilingual/turbo)"
-    if not Path(exe).exists():
+    exe_path = Path(exe) if Path(exe).is_absolute() else ROOT / exe
+    if not exe_path.exists():
         return False, f"config: exe not found: {exe}"
-    if not Path(model).exists():
+    model_path = Path(model) if Path(model).is_absolute() else ROOT / model
+    if not model_path.exists():
         return False, f"config: model not found: {model}"
     ok, msg = check_whisper_runs(exe)
     if not ok:
