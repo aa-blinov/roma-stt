@@ -114,7 +114,7 @@ echo   !CW! 2.!C0! Проверка готовности
 echo      Убедиться, что всё установлено. После пункта 1.
 echo.
 echo   !CW! 3.!C0! Запустить службу ^(в трее^)
-echo      Выбор режима: cpu / cuda (NVIDIA) / amd (AMD). Горячая клавиша из config.yaml.
+echo      Режим из config.yaml. Горячая клавиша из config.yaml.
 echo.
 echo   !CW! 4.!C0! Остановить службу
 echo      Завершить работу Roma-STT в трее.
