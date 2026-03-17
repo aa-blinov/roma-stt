@@ -160,16 +160,12 @@ goto menu
 echo !CY![1]!C0! Установка...
 uv --version >nul 2>&1
 if errorlevel 1 (
-    echo Устанавливаю системные программы (uv, Git, CMake, VS Build Tools)...
-    echo !CD!Установка через winget (не требует прав администратора).!C0!
-    call scripts\install_tools.bat
-    uv --version >nul 2>&1
-    if errorlevel 1 (
-        echo.
-        echo !CW!uv ещё не в PATH. Перезапустите батник и снова выберите 1.!C0!
-        pause
-        goto menu
-    )
+    echo.
+    echo !CR!uv не найден.!C0! Установите командой:
+    echo     winget install astral-sh.uv
+    echo Затем закройте это окно, откройте заново и снова выберите 1.
+    pause
+    goto menu
 )
 call :detect_gpu
 set "arch="
