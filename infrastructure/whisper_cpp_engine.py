@@ -22,6 +22,7 @@ class WhisperCppEngine:
             encoding="utf-8",
             timeout=300,
             cwd=str(self.exe_path.parent),
+            creationflags=subprocess.CREATE_NO_WINDOW,
         )
 
     def transcribe(self, audio_path: str, language: str = "ru", n_gpu_layers: int = 0) -> str:
