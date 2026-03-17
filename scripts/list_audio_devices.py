@@ -53,6 +53,7 @@ def main() -> int:
         if config is None:
             config = {}
         config.pop("input_device", None)
+        config.pop("input_device_name", None)
         CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
         CONFIG_PATH.write_text(yaml.dump(config, allow_unicode=True, default_flow_style=False), encoding="utf-8")
         print("Сброшено: используется системный микрофон по умолчанию.")
@@ -69,11 +70,13 @@ def main() -> int:
         else:
             import yaml
             config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8")) or {}
+        chosen = indices[args.set]
         config["input_device"] = args.set
+        config["input_device_name"] = chosen["name"]
         CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
         import yaml
         CONFIG_PATH.write_text(yaml.dump(config, allow_unicode=True, default_flow_style=False), encoding="utf-8")
-        print(f"В config.yaml записано: input_device: {args.set} ({indices[args.set]['name']})")
+        print(f"В config.yaml записано: input_device: {args.set} ({chosen['name']})")
     return 0
 
 

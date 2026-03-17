@@ -14,8 +14,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "whisper_cpp_path_amd": "",
     "whisper_model_path": "",
     "language": "ru",
-    "input_device": None,  # None = системный микрофон по умолчанию, иначе индекс устройства
-    "notifications": False,  # всплывающие уведомления Windows (по умолчанию выключены)
+    "input_device": None,       # None = системный по умолчанию, иначе PortAudio-индекс
+    "input_device_name": None,  # имя устройства — для поиска при смене индекса
+    "notifications": False,     # всплывающие уведомления Windows (по умолчанию выключены)
 }
 
 

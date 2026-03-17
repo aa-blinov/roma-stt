@@ -108,6 +108,71 @@ def create_engine(module: str, config: dict) -> WhisperCppEngine:
     return WhisperCppEngine(exe_path=exe, model_path=model)
 
 
+def _resolve_input_device(config: dict, logger: logging.Logger) -> int | None:
+    """Resolve saved input device to a valid PortAudio index.
+
+    PortAudio indices can drift between boots (device plug/unplug, driver update).
+    Strategy:
+      1. If nothing saved → return None (system default).
+      2. Try saved index → if name matches saved name → OK.
+      3. Name mismatch or index out of range → search all input devices by name.
+      4. Found by name → update index in config (caller should save).
+      5. Not found → clear both fields, return None and warn.
+    """
+    import sounddevice as sd
+
+    saved_index = config.get("input_device")
+    saved_name = config.get("input_device_name")
+
+    if saved_index is None and saved_name is None:
+        return None  # no device configured — use system default
+
+    try:
+        devices = sd.query_devices()
+    except Exception as e:
+        logger.warning("could not query audio devices: %s", e)
+        return None
+
+    # --- 1. Try saved index ---
+    if saved_index is not None:
+        try:
+            idx = int(saved_index)
+            dev = devices[idx]
+            if isinstance(dev, dict) and dev.get("max_input_channels", 0) > 0:
+                current_name = dev.get("name", "")
+                if saved_name is None or current_name == saved_name:
+                    # index still valid and name matches (or no name saved yet)
+                    config["input_device_name"] = current_name  # backfill name
+                    return idx
+                # Name mismatch — index drifted, fall through to name search
+                logger.info(
+                    "input device index %d name changed: saved=%r current=%r — searching by name",
+                    idx, saved_name, current_name,
+                )
+        except (IndexError, TypeError, ValueError):
+            logger.info("input device index %s out of range — searching by name", saved_index)
+
+    # --- 2. Search by name ---
+    if saved_name:
+        for i, dev in enumerate(devices):
+            if not isinstance(dev, dict):
+                continue
+            if dev.get("max_input_channels", 0) > 0 and dev.get("name") == saved_name:
+                logger.info("input device found by name %r at new index %d (was %s)", saved_name, i, saved_index)
+                config["input_device"] = i
+                config["input_device_name"] = saved_name
+                return i
+
+    # --- 3. Not found ---
+    logger.warning(
+        "input device not found: index=%s name=%r — falling back to system default",
+        saved_index, saved_name,
+    )
+    config["input_device"] = None
+    config["input_device_name"] = None
+    return None
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Roma-STT: Speech-to-Text tray app (Windows)")
     parser.add_argument("--module", choices=["cpu", "cuda", "amd"], default="cpu", help="STT module")
@@ -197,12 +262,13 @@ def main() -> None:
 
         os.close(fd)
         fallback_used[0] = False
-        input_device = config.get("input_device")
-        if input_device is not None:
+        input_device = _resolve_input_device(config, logger)
+        if config.get("input_device") != input_device:
+            # index was updated (name search found new index) — persist
             try:
-                input_device = int(input_device)
-            except (TypeError, ValueError):
-                input_device = None
+                save_config(config_path, config)
+            except Exception as e:
+                logger.warning("save_config after device re-resolve: %s", e)
         record_thread = threading.Thread(
             target=record_to_wav_until_stopped,
             args=(wav_path, stop_event),
