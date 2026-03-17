@@ -393,7 +393,7 @@ for /f "usebackq tokens=*" %%b in (`uv run python -c "from infrastructure.config
 echo Служба запускается в трее. Запись: !hk_r!, Стоп: !hk_s!
 echo Это окно можно закрыть — служба продолжит работать в трее.
 echo Остановить: пункт 4.
-start "Roma-STT" /MIN uv run python main.py --module !mod!
+start "" /B .venv\Scripts\pythonw.exe main.py --module !mod!
 pause
 goto menu
 
