@@ -345,8 +345,9 @@ if errorlevel 1 (
 for /f "usebackq tokens=*" %%a in (`uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print(cfg.get('hotkey_record', 'Ctrl+F2'))"`) do set "hk_r=%%a"
 for /f "usebackq tokens=*" %%b in (`uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print(cfg.get('hotkey_stop', 'Ctrl+F3'))"`) do set "hk_s=%%b"
 echo Служба запускается в трее. Запись: !hk_r!, Стоп: !hk_s!
-echo Остановить: пункт 4 или закройте это окно.
-start /B "Roma-STT" uv run python main.py --module !mod!
+echo Это окно можно закрыть — служба продолжит работать в трее.
+echo Остановить: пункт 4.
+start "Roma-STT" /MIN uv run python main.py --module !mod!
 pause
 goto menu
 
