@@ -141,9 +141,12 @@ echo.
 echo  12. Уведомления Windows
 echo      Включить или выключить всплывающие уведомления (по умолчанию выключены).
 echo.
-echo  13. Выход
+echo  13. Постобработка текста
+echo      Заглавная буква, точка в конце, удаление артефактов Whisper (по умолчанию включена).
 echo.
-set /p choice="Введите цифру (0-13, Enter — обновить меню): "
+echo  14. Выход
+echo.
+set /p choice="Введите цифру (0-14, Enter — обновить меню): "
 if "!choice!"=="" goto menu
 if "%choice%"=="0" goto install_tools
 if "%choice%"=="1" goto install
@@ -158,8 +161,9 @@ if "%choice%"=="9" goto set_language
 if "%choice%"=="10" goto set_input_device
 if "%choice%"=="11" goto remove
 if "%choice%"=="12" goto toggle_notifications
-if "%choice%"=="13" exit /b 0
-echo Неизвестный выбор. Введите цифру от 0 до 13.
+if "%choice%"=="13" goto toggle_postprocess
+if "%choice%"=="14" exit /b 0
+echo Неизвестный выбор. Введите цифру от 0 до 14.
 goto menu
 
 :install_tools
@@ -234,6 +238,20 @@ if not exist .venv (
 for /f "usebackq tokens=*" %%a in (`uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print('включены' if cfg.get('notifications', False) else 'выключены')"`) do set "notif_cur=%%a"
 echo Сейчас уведомления: !notif_cur!
 uv run python -c "from infrastructure.config_repo import load_config, save_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); cfg['notifications']=not cfg.get('notifications', False); save_config(p,cfg); print('Уведомления теперь:', 'включены' if cfg['notifications'] else 'выключены')"
+pause
+goto menu
+
+:toggle_postprocess
+echo [13] Постобработка текста...
+if not exist .venv (
+    echo Сначала выполните 1 ^(Установка^).
+    pause
+    goto menu
+)
+for /f "usebackq tokens=*" %%a in (`uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); print('включена' if cfg.get('postprocess', True) else 'выключена')"`) do set "pp_cur=%%a"
+echo Сейчас постобработка: !pp_cur!
+echo Что делает: заглавная буква, точка в конце, удаление [BLANK_AUDIO] и других артефактов Whisper.
+uv run python -c "from infrastructure.config_repo import load_config, save_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); cfg['postprocess']=not cfg.get('postprocess', True); save_config(p,cfg); print('Постобработка теперь:', 'включена' if cfg['postprocess'] else 'выключена')"
 pause
 goto menu
 
