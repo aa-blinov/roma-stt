@@ -3,14 +3,13 @@ chcp 65001 >nul
 setlocal EnableDelayedExpansion
 cd /d "%~dp0"
 
-rem ANSI colors (Windows 10+)
-for /f %%a in ('echo prompt $E^| cmd /q /c prompt $E') do set "ESC=%%a"
-set "C0=!ESC![0m"
-set "CY=!ESC![96m"
-set "CG=!ESC![92m"
-set "CR=!ESC![91m"
-set "CW=!ESC![93m"
-set "CD=!ESC![90m"
+rem ANSI colors (ESC char embedded directly — works without for/f trick)
+set "C0=[0m"
+set "CY=[96m"
+set "CG=[92m"
+set "CR=[91m"
+set "CW=[93m"
+set "CD=[90m"
 
 if not "%~1"=="" goto run_cmd
 goto menu
