@@ -89,7 +89,6 @@ def main() -> int:
             print("Сборка не удалась — модель не качаем. После успешной сборки: пункт 5 -> модели.")
     if not args.no_build_check:
         check_build()
-    print("Install done. Run Check readiness (menu 2) or Start (menu 6).")
     return 0
 
 
