@@ -4,7 +4,6 @@ import argparse
 import logging
 import os
 import subprocess
-import tempfile
 import threading
 import time
 import winsound
@@ -257,10 +256,7 @@ def main() -> None:
         except Exception:
             pass
         stop_event.clear()
-        fd, wav_path = tempfile.mkstemp(suffix=".wav")
-        import os
-
-        os.close(fd)
+        wav_path = str(Path(__file__).resolve().parent / "last_record.wav")
         fallback_used[0] = False
         input_device = _resolve_input_device(config, logger)
         if config.get("input_device") != input_device:
