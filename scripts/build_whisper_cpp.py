@@ -227,7 +227,9 @@ def build(arch: str = "cpu") -> tuple[bool, str]:
         vulkan_sdk = _find_vulkan_sdk()
         if vulkan_sdk:
             print(f"  [amd] Vulkan SDK found at: {vulkan_sdk}")
-            base_cmake.append(f"-DVULKAN_SDK={vulkan_sdk}")
+            # cmake FindVulkan looks for Vulkan_ROOT (cmake var) or VULKAN_SDK (env var)
+            # -DVULKAN_SDK is NOT the right variable name; use -DVulkan_ROOT
+            base_cmake.append(f"-DVulkan_ROOT={vulkan_sdk}")
         else:
             print("  [amd] Vulkan SDK NOT found — install via step 0 or: winget install KhronosGroup.VulkanSDK")
 
