@@ -41,10 +41,14 @@ class WhisperCppEngine:
         args_with_gpu = base_args + ["-ngl", str(n_gpu_layers)] if n_gpu_layers > 0 else base_args
 
         def is_ngl_unsupported(stderr: str) -> bool:
+            # Only flag when the binary explicitly rejects -ngl / --n-gpu-layers
+            # as an unknown/unrecognized argument.  Do NOT match broad "gpu"
+            # so that CUDA init messages (e.g. "invalid CUDA device") don't
+            # cause a false positive and silently disable GPU acceleration.
             s = (stderr or "").lower()
-            return ("ngl" in s or "n-gpu-layers" in s or "gpu" in s) and (
-                "unknown" in s or "invalid" in s or "unrecognized" in s
-            )
+            arg_rejected = "unknown" in s or "unrecognized" in s or "invalid option" in s
+            mentions_ngl = "ngl" in s or "n-gpu-layers" in s
+            return arg_rejected and mentions_ngl
 
         result = self._run_whisper(args_with_gpu)
         used_ngl = n_gpu_layers > 0

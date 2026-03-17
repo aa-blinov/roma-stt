@@ -101,3 +101,22 @@ def test_transcribe_no_retry_on_non_ngl_error(mock_run):
     except sp.CalledProcessError:
         pass
     assert mock_run.call_count == 1
+
+
+@patch("infrastructure.whisper_cpp_engine.subprocess.run")
+def test_transcribe_no_retry_on_cuda_gpu_message(mock_run):
+    """CUDA init messages mentioning 'gpu' + 'invalid' must NOT trigger ngl retry."""
+    # This was a false-positive: CUDA binary writes "invalid CUDA device" to stderr
+    # which used to match the old broad 'gpu' check and silently disable GPU.
+    cuda_result = MagicMock(
+        returncode=0,
+        stdout="распознанный текст",
+        stderr="ggml_cuda_init: invalid CUDA device ordinal",
+    )
+    mock_run.return_value = cuda_result
+
+    engine = WhisperCppEngine(exe_path="w.exe", model_path="m.ggml")
+    result = engine.transcribe("a.wav", n_gpu_layers=32)
+
+    assert mock_run.call_count == 1  # no retry
+    assert result == "распознанный текст"
