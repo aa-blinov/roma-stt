@@ -36,7 +36,7 @@ Repair-WinGetPackageManager -AllUsers
 
 ### Варианты запуска
 
-- **Интерактивный (меню):** запустите **`roma-stt.bat`** без аргументов. Появится меню, рекомендуемый порядок: 1 → 2 → 5.
+- **Интерактивный (меню):** запустите **`roma-stt.bat`** без аргументов. Появится меню, рекомендуемый порядок: 0 → 1 → 2 → 3.
 - **Командная строка:** **`roma-stt.bat <команда> [аргументы]`**:
   - `install-tools` — установка системных программ (как пункт 0).
   - `install [--arch cpu|cuda|amd]` — полная установка (venv, сборка whisper, модель).
@@ -76,9 +76,9 @@ Repair-WinGetPackageManager -AllUsers
 
 При установке (пункт **1**) или пересборке (`build-whisper`) программа спрашивает тип видеокарты.  
 
-- **CUDA** (NVIDIA): требуется [NVIDIA CUDA Toolkit](https://developer.nvidia.com/cuda-downloads). Можно поставить через батник: пункт **0** (Установка программ) → на вопрос «Установить CUDA?» ответить **y**, либо вручную: `winget install -e --id Nvidia.CUDA`. После сборки, если cmake не находит nvcc, задайте `CUDAToolkit_ROOT` (путь к папке CUDA, например `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.x`).
-- **AMD** (Vulkan): требуется Vulkan SDK.  
-Движок автоматически задействует GPU (параметр `-ngl 99`), если выбрана соответствующая архитектура.
+- **CUDA** (NVIDIA): требуется [NVIDIA CUDA Toolkit](https://developer.nvidia.com/cuda-downloads). Пункт **0** автоматически определяет видеокарту NVIDIA и предлагает поставить CUDA Toolkit (`winget install -e --id Nvidia.CUDA`). После сборки, если cmake не находит nvcc, задайте `CUDAToolkit_ROOT` (путь к папке CUDA, например `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.x`).
+- **AMD** (Vulkan): требуется [Vulkan SDK](https://vulkan.lunarg.com/). Пункт **0** определяет видеокарту AMD и предлагает поставить Vulkan SDK (`winget install --id KhronosGroup.VulkanSDK`).
+- GPU-ускорение включается на уровне компиляции whisper.cpp (флаги `-DGGML_CUDA=ON` / `-DGGML_VULKAN=ON`). Если выбрана архитектура cuda или amd, движок также передаёт `-ngl 99` при распознавании; если бинарник не поддерживает этот флаг — автоматически повторяет запуск без него.
 
 ## Использование
 
