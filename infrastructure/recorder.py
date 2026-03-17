@@ -43,11 +43,6 @@ def record_to_wav(
         wav.writeframes(data_int.tobytes())
 
 
-def _rec_chunk(chunk_samples: int, rec_kw: dict) -> np.ndarray:
-    """One chunk; raises sounddevice.PortAudioError on failure."""
-    return sd.rec(chunk_samples, **rec_kw)
-
-
 def record_to_wav_until_stopped(
     path: str | Path,
     stop_event: threading.Event,
@@ -56,38 +51,49 @@ def record_to_wav_until_stopped(
     device: int | None = None,
     fallback_used: list | None = None,
 ) -> None:
-    """Record in chunks until stop_event is set, then save to WAV. device = None для системного по умолчанию.
-    If device is invalid (e.g. unplugged), falls back to default and sets fallback_used[0]=True when given."""
+    """Record continuously (callback-based) until stop_event is set, then save to WAV.
+
+    Uses sd.InputStream with a callback so PortAudio fills buffers without gaps.
+    If device is invalid (e.g. unplugged), falls back to default and sets fallback_used[0]=True.
+    """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    chunk_samples = int(CHUNK_SEC * samplerate)
     chunks: list[np.ndarray] = []
-    rec_kw: dict = dict(samplerate=samplerate, channels=channels, dtype=DTYPE)
+
+    def _callback(indata: np.ndarray, frames: int, time_info, status) -> None:  # noqa: ARG001
+        if status:
+            logger.warning("sounddevice status: %s", status)
+        chunks.append(indata.copy())
+
+    stream_kw: dict = dict(
+        samplerate=samplerate,
+        channels=channels,
+        dtype=DTYPE,
+        callback=_callback,
+        blocksize=int(CHUNK_SEC * samplerate),
+    )
     if device is not None:
-        rec_kw["device"] = device
+        stream_kw["device"] = device
+
+    def _run(kw: dict) -> None:
+        with sd.InputStream(**kw):
+            stop_event.wait()
 
     try:
-        data = _rec_chunk(chunk_samples, rec_kw)
+        _run(stream_kw)
     except sd.PortAudioError as e:
         err_str = str(e)
         if (str(PA_INVALID_DEVICE) in err_str or "-9996" in err_str) and device is not None:
             logger.warning("invalid input device %s, using default", device)
-            rec_kw.pop("device", None)
+            stream_kw.pop("device", None)
             if fallback_used is not None:
                 fallback_used[0] = True
-            data = _rec_chunk(chunk_samples, rec_kw)
+            _run(stream_kw)
         else:
             raise
 
-    while not stop_event.is_set():
-        sd.wait()
-        if stop_event.is_set():
-            break
-        chunks.append(data.copy())
-        data = _rec_chunk(chunk_samples, rec_kw)
     if not chunks:
-        # Minimal silent WAV
-        data_int = np.zeros((chunk_samples, channels), dtype=np.int16)
+        data_int = np.zeros((int(CHUNK_SEC * samplerate), channels), dtype=np.int16)
     else:
         data_int = (np.clip(np.vstack(chunks), -1.0, 1.0) * 32767).astype(np.int16)
     with wave.open(str(path), "wb") as wav:

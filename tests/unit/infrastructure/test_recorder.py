@@ -9,11 +9,51 @@ import numpy as np
 import sounddevice as sd
 
 from infrastructure.recorder import (
+    CHUNK_SEC,
     RECORD_CHANNELS,
     RECORD_RATE,
     record_to_wav,
     record_to_wav_until_stopped,
 )
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _make_stream_cls(chunks: int, stop: Event, error_with_device: bool = False):
+    """Fake sd.InputStream that delivers `chunks` callbacks then sets stop.
+
+    If error_with_device=True, raises PortAudioError when 'device' kwarg present
+    (simulates invalid-device error), and succeeds on the fallback call.
+    """
+    blocksize = int(CHUNK_SEC * RECORD_RATE)
+    fake_data = np.zeros((blocksize, RECORD_CHANNELS), dtype=np.float32)
+
+    class FakeStream:
+        def __init__(self, **kwargs):
+            self._cb = kwargs.get("callback")
+            self._has_device = "device" in kwargs
+
+        def __enter__(self):
+            if error_with_device and self._has_device:
+                raise sd.PortAudioError("Invalid device [-9996]")
+            for _ in range(chunks):
+                if self._cb:
+                    self._cb(fake_data, blocksize, None, None)
+            stop.set()
+            return self
+
+        def __exit__(self, *_):
+            pass
+
+    return FakeStream
+
+
+# ---------------------------------------------------------------------------
+# record_to_wav
+# ---------------------------------------------------------------------------
 
 
 def test_record_to_wav_accepts_duration_and_path():
@@ -34,65 +74,49 @@ def test_record_constants():
     assert RECORD_CHANNELS == 1
 
 
-# --- record_to_wav_until_stopped ---
-
-
-def _fake_chunk():
-    return np.zeros((int(0.5 * RECORD_RATE), RECORD_CHANNELS), dtype=np.float32)
+# ---------------------------------------------------------------------------
+# record_to_wav_until_stopped
+# ---------------------------------------------------------------------------
 
 
 def test_record_until_stopped_creates_wav():
-    """Stop immediately — should still produce a valid WAV file."""
+    """Stop before any chunks — should still produce a valid (silent) WAV file."""
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "out.wav"
         stop = Event()
-        stop.set()  # already stopped
 
-        with patch("infrastructure.recorder._rec_chunk", return_value=_fake_chunk()):
-            with patch("infrastructure.recorder.sd.wait"):
-                record_to_wav_until_stopped(path, stop)
+        with patch("infrastructure.recorder.sd.InputStream", _make_stream_cls(0, stop)):
+            record_to_wav_until_stopped(path, stop)
 
         assert path.exists()
-        assert path.stat().st_size >= 44
+        assert path.stat().st_size >= 44  # at least WAV header
 
 
 def test_record_until_stopped_collects_chunks():
-    """Two chunks before stop — both end up in the WAV (larger than minimal)."""
+    """Three chunks → WAV must be larger than the minimal silent placeholder."""
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "out.wav"
         stop = Event()
-        call_count = [0]
 
-        def fake_chunk(n, kw):
-            call_count[0] += 1
-            if call_count[0] >= 3:
-                stop.set()
-            return _fake_chunk()
-
-        with patch("infrastructure.recorder._rec_chunk", side_effect=fake_chunk):
-            with patch("infrastructure.recorder.sd.wait"):
-                record_to_wav_until_stopped(path, stop)
+        with patch("infrastructure.recorder.sd.InputStream", _make_stream_cls(3, stop)):
+            record_to_wav_until_stopped(path, stop)
 
         assert path.exists()
-        assert path.stat().st_size > 44  # audio data present
+        assert path.stat().st_size > 44  # real audio data present
 
 
 def test_record_until_stopped_device_fallback():
-    """Invalid device (-9996) → retry with default device, set fallback_used[0]=True."""
+    """Invalid device (-9996) → retry without device, set fallback_used[0]=True."""
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "out.wav"
         stop = Event()
-        stop.set()
         fallback_used = [False]
 
-        def fake_chunk(n, kw):
-            if "device" in kw:
-                raise sd.PortAudioError("Invalid device [-9996]")
-            return _fake_chunk()
-
-        with patch("infrastructure.recorder._rec_chunk", side_effect=fake_chunk):
-            with patch("infrastructure.recorder.sd.wait"):
-                record_to_wav_until_stopped(path, stop, device=5, fallback_used=fallback_used)
+        with patch(
+            "infrastructure.recorder.sd.InputStream",
+            _make_stream_cls(1, stop, error_with_device=True),
+        ):
+            record_to_wav_until_stopped(path, stop, device=5, fallback_used=fallback_used)
 
         assert fallback_used[0] is True
         assert path.exists()
@@ -100,14 +124,24 @@ def test_record_until_stopped_device_fallback():
 
 def test_record_until_stopped_no_fallback_without_device():
     """PortAudioError with device=None must propagate (no fallback possible)."""
+
+    class ErrorStream:
+        def __init__(self, **_):
+            pass
+
+        def __enter__(self):
+            raise sd.PortAudioError("some error")
+
+        def __exit__(self, *_):
+            pass
+
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "out.wav"
         stop = Event()
 
-        with patch("infrastructure.recorder._rec_chunk", side_effect=sd.PortAudioError("some error")):
-            with patch("infrastructure.recorder.sd.wait"):
-                try:
-                    record_to_wav_until_stopped(path, stop, device=None)
-                    assert False, "should have raised PortAudioError"
-                except sd.PortAudioError:
-                    pass
+        with patch("infrastructure.recorder.sd.InputStream", ErrorStream):
+            try:
+                record_to_wav_until_stopped(path, stop, device=None)
+                assert False, "should have raised PortAudioError"
+            except sd.PortAudioError:
+                pass
