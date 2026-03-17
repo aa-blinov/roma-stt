@@ -113,7 +113,7 @@ echo   2. Проверка готовности
 echo      Убедиться, что всё установлено. Запускайте после пункта 1.
 echo.
 echo   3. Запустить службу (в трее)
-echo      При запуске: 1=cpu, 2=cuda, 3=amd. Горячая клавиша из config.yaml.
+echo      Выбор режима: cpu / cuda (NVIDIA) / amd (AMD). Горячая клавиша из config.yaml.
 echo.
 echo   4. Остановить службу
 echo      Завершить работу Roma-STT в трее.
@@ -223,11 +223,6 @@ goto menu
 
 :check
 echo [2] Проверка готовности...
-if not exist .venv (
-    echo.
-    echo   Сначала нужна установка. Выберите пункт 1 ^(Установка^), дождитесь окончания, потом снова пункт 2.
-    echo.
-)
 uv run python scripts\check_ready.py
 pause
 goto menu
@@ -331,10 +326,10 @@ echo.
 echo Примеры: ru, en, de, fr, es, it, jp, zh.
 set /p newlang="Введите код языка (Enter — в главное меню): "
 if "!newlang!"=="" goto menu
-echo.
-echo Записываем в config.yaml: language: "%newlang%"
-uv run python -c "from infrastructure.config_repo import load_config, save_config; from pathlib import Path; import sys; p=Path('config.yaml'); cfg=load_config(p); cfg['language']=sys.argv[1]; save_config(p,cfg)" "%newlang%"
-echo Готово.
+if "!newlang!"=="russian" ( echo Используйте код "ru", а не "russian". & pause & goto set_language )
+if "!newlang!"=="english" ( echo Используйте код "en", а не "english". & pause & goto set_language )
+uv run python -c "from infrastructure.config_repo import load_config, save_config; from pathlib import Path; import sys; p=Path('config.yaml'); cfg=load_config(p); cfg['language']=sys.argv[1]; save_config(p,cfg)" "!newlang!"
+echo Язык установлен: !newlang!
 pause
 goto menu
 
@@ -359,6 +354,11 @@ if not exist .venv (
     pause
     goto menu
 )
+if exist .roma-stt.pid (
+    echo Служба уже запущена. Для перезапуска сначала остановите её ^(пункт 4^).
+    pause
+    goto menu
+)
 call :detect_gpu
 set "mod="
 if "!gpu_nvidia!"=="0" if "!gpu_amd!"=="0" (
@@ -376,6 +376,11 @@ if "!gpu_nvidia!"=="0" if "!gpu_amd!"=="0" (
     if "!mod!"=="1" set mod=cpu
     if "!mod!"=="2" set mod=cuda
     if "!mod!"=="3" set mod=amd
+    if not "!mod!"=="cpu" if not "!mod!"=="cuda" if not "!mod!"=="amd" (
+        echo Неверный выбор. Введите одну из предложенных цифр.
+        pause
+        goto start
+    )
 )
 if "!mod!"=="cuda" if "!gpu_nvidia!"=="0" (
     echo.
@@ -433,7 +438,6 @@ if exist .roma-stt.pid (
     taskkill /FI "WINDOWTITLE eq Roma-STT*" /F >nul 2>nul
 )
 echo Готово.
-echo Если служба не была запущена — ничего страшного. Чтобы начать: сначала 1 ^(Установка^), потом 2 ^(Проверка^), потом 3 ^(Запуск^).
 pause
 goto menu
 
