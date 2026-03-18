@@ -1,5 +1,5 @@
-"""Вывести PID процессов python.exe, в командной строке которых есть main.py и roma-stt. Для пункта 7 батника.
-Использует wmic (не PowerShell), чтобы не менять шрифт/настройки консоли."""
+"""Вывести PID процессов python.exe / pythonw.exe, в командной строке которых есть main.py и roma-stt.
+Для пункта 4 батника (остановка службы). Служба запускается через pythonw.exe — ищем оба имени."""
 
 import re
 import subprocess
@@ -9,31 +9,32 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def main() -> int:
-    # wmic не меняет настройки консоли в отличие от PowerShell
+def _pids_for_process(name: str) -> list[str]:
     try:
         r = subprocess.run(
-            ["wmic", "process", "where", "name='python.exe'", "get", "processid,commandline"],
+            ["wmic", "process", "where", f"name='{name}'", "get", "processid,commandline"],
             capture_output=True,
             text=True,
             timeout=15,
             cwd=ROOT,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired):
-        return 0
+        return []
     if r.returncode != 0 or not r.stdout:
-        return 0
-    lines = r.stdout.strip().splitlines()
-    if not lines:
-        return 0
-    # Первая строка — заголовок (ProcessId  CommandLine), дальше — данные
-    for line in lines[1:]:
+        return []
+    pids = []
+    for line in r.stdout.strip().splitlines()[1:]:
         if "main.py" not in line or "roma-stt" not in line:
             continue
-        # PID — первое число в строке (колонка ProcessId идёт первой в wmic get processid,commandline)
         nums = re.findall(r"\d+", line)
         if nums:
-            print(nums[0])
+            pids.append(nums[0])
+    return pids
+
+
+def main() -> int:
+    for pid in _pids_for_process("pythonw.exe") + _pids_for_process("python.exe"):
+        print(pid)
     return 0
 
 
