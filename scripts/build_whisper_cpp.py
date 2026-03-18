@@ -198,7 +198,7 @@ def _no_compiler_hint() -> str:
 
     return (
         "\n\nMSVC-компилятор не найден и Visual Studio Build Tools не обнаружены автоматически.\n"
-        "Установите через батник пункт 0 (Установка программ) или вручную:\n"
+        "Установите через меню пункт 1 (Установка) или вручную:\n"
         "  winget install Microsoft.VisualStudio.2022.BuildTools\n"
         "После установки перезапустите консоль и повторите сборку."
     )
@@ -231,7 +231,7 @@ def build(arch: str = "cpu") -> tuple[bool, str]:
             # -DVULKAN_SDK is NOT the right variable name; use -DVulkan_ROOT
             base_cmake.append(f"-DVulkan_ROOT={vulkan_sdk}")
         else:
-            print("  [amd] Vulkan SDK NOT found — install via step 0 or: winget install KhronosGroup.VulkanSDK")
+            print("  [amd] Vulkan SDK NOT found — install via menu item 1 or: winget install KhronosGroup.VulkanSDK")
 
     # Build strategy (tried in order):
     # A. cl.exe in PATH (Developer Command Prompt) → Ninja, single-config
@@ -309,14 +309,14 @@ def build(arch: str = "cpu") -> tuple[bool, str]:
         if arch == "cuda" and ("nvcc" in out or "CUDA Toolkit" in out or "CUDAToolkit" in out):
             hint += (
                 "\n\nДля CUDA нужен NVIDIA CUDA Toolkit. "
-                "Установить: пункт 0 батника → ответить «y» на вопрос про CUDA. "
+                "Установить: меню пункт 1 (Установка) → ответить «y» на вопрос про CUDA. "
                 "Или: winget install -e --id Nvidia.CUDA\n"
                 "После установки перезапустите консоль."
             )
         if arch == "amd" and ("vulkan" in out.lower()):
             hint += (
                 "\n\nДля AMD нужен Vulkan SDK (LunarG). "
-                "Установить: пункт 0 батника → ответить «y» на вопрос про Vulkan SDK. "
+                "Установить: меню пункт 1 (Установка) → ответить «y» на вопрос про Vulkan SDK. "
                 "Или: winget install KhronosGroup.VulkanSDK\n"
                 "После установки перезапустите консоль."
             )
