@@ -31,6 +31,18 @@ function Set-Config {
     & uv run python -c "from infrastructure.config_repo import load_config, save_config; from pathlib import Path; import sys; p=Path('config.yaml'); cfg=load_config(p); cfg['$key']=sys.argv[1]; save_config(p,cfg)" $value 2>$null
 }
 
+function Refresh-Env {
+    # Обновляем PATH и ключевые переменные из реестра — после winget install
+    $m = [System.Environment]::GetEnvironmentVariable("PATH", "Machine")
+    $u = [System.Environment]::GetEnvironmentVariable("PATH", "User")
+    if ($m -or $u) { $env:PATH = "$m;$u" }
+    foreach ($var in @("VULKAN_SDK", "CUDA_PATH", "CUDA_PATH_V12_0", "CUDA_PATH_V11_8")) {
+        $v = [System.Environment]::GetEnvironmentVariable($var, "Machine")
+        if (-not $v) { $v = [System.Environment]::GetEnvironmentVariable($var, "User") }
+        if ($v) { [System.Environment]::SetEnvironmentVariable($var, $v, "Process") }
+    }
+}
+
 function Detect-Gpu {
     $nvidiaName = ""
     $amdName    = ""
@@ -203,21 +215,28 @@ Repair-WinGetPackageManager -AllUsers 2>$null
             $cuda = Read-Host "Установить сейчас? (y/N)"
             if ($cuda -match '^[yYдД]$') {
                 & winget install -e --id Nvidia.CUDA --accept-package-agreements --accept-source-agreements --silent
+                Refresh-Env
                 Write-Host "После установки может потребоваться перезагрузка." -ForegroundColor Yellow
             }
         }
     }
 
     # Vulkan SDK (только для режима amd)
+    # vulkaninfo есть в GPU-драйверах, но без dev-части (заголовков/glslc)
+    # Нужен полный LunarG SDK: проверяем VULKAN_SDK или glslc
     if ($arch -eq "amd") {
-        if (Get-Command vulkaninfo -ErrorAction SilentlyContinue) {
-            Write-Host "Vulkan SDK уже установлен." -ForegroundColor DarkGray
+        $vulkanDev = ($env:VULKAN_SDK -and (Test-Path $env:VULKAN_SDK)) -or (Get-Command glslc -ErrorAction SilentlyContinue)
+        if ($vulkanDev) {
+            Write-Host "Vulkan SDK (dev) уже установлен." -ForegroundColor DarkGray
         } else {
             Write-Host ""
-            Write-Host "Vulkan SDK нужен для режима amd (~200 МБ)." -ForegroundColor Yellow
+            Write-Host "Vulkan SDK (LunarG) нужен для режима amd (~200 МБ)." -ForegroundColor Yellow
+            Write-Host "  (vulkaninfo из GPU-драйвера не считается — нужны заголовки и glslc)" -ForegroundColor DarkGray
             $vulkan = Read-Host "Установить сейчас? (y/N)"
             if ($vulkan -match '^[yYдД]$') {
                 & winget install --id KhronosGroup.VulkanSDK --accept-package-agreements --accept-source-agreements
+                Refresh-Env
+                Write-Host "Vulkan SDK установлен. VULKAN_SDK=$env:VULKAN_SDK" -ForegroundColor Green
             }
         }
     }
@@ -256,6 +275,9 @@ function Do-Install {
     Write-Host "Шаг 1/2: Проверка и установка системных инструментов..." -ForegroundColor Cyan
     $ok = Install-Tools $a
     if (-not $ok) { Pause-Continue; return }
+
+    # Обновляем PATH из реестра (winget мог добавить новые пути)
+    Refresh-Env
 
     # Проверяем uv после установки (PATH может не обновиться без перезапуска)
     if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
@@ -330,6 +352,7 @@ function Do-Start {
     Write-Host "Остановить: пункт 4. Это окно можно закрыть."
     $pythonw = Join-Path $PSScriptRoot ".venv\Scripts\pythonw.exe"
     Start-Process $pythonw -ArgumentList @("main.py", "--module", $mod) -WorkingDirectory $PSScriptRoot
+    Start-Sleep -Seconds 2
     Pause-Continue
 }
 
