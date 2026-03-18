@@ -87,7 +87,7 @@ function Show-Menu {
     Write-Host "  " -NoNewline; Write-Host " 4." -NoNewline -ForegroundColor Yellow; Write-Host " Остановить службу"
     Write-Host "     Завершить работу Roma-STT в трее." -ForegroundColor DarkGray
     Write-Host ""
-    Write-Host " --- Настройки -----------------------------------------------" -ForegroundColor DarkGray
+    Write-Host " --- Настройки (применяются после перезапуска: 4 -> 3) ------" -ForegroundColor DarkGray
     Write-Host "  " -NoNewline; Write-Host " 5." -NoNewline -ForegroundColor Yellow; Write-Host " Модели распознавания       " -NoNewline; Write-Host "[$modelVal]" -ForegroundColor Cyan
     Write-Host "     Список моделей — выбрать или скачать и выбрать." -ForegroundColor DarkGray
     Write-Host "  " -NoNewline; Write-Host " 6." -NoNewline -ForegroundColor Yellow; Write-Host " Подбор свободной горячей клавиши"
