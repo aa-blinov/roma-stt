@@ -9,6 +9,12 @@ Roma-STT — меню управления
 $env:PYTHONIOENCODING = 'utf-8'
 $env:PYTHONUTF8 = '1'
 $Host.UI.RawUI.WindowTitle = "Roma-STT"
+try {
+    $buf = $Host.UI.RawUI.BufferSize
+    if ($buf.Height -lt 55) { $buf.Height = 9999; $Host.UI.RawUI.BufferSize = $buf }
+    $win = $Host.UI.RawUI.WindowSize
+    if ($win.Height -lt 55) { $win.Height = 55; $Host.UI.RawUI.WindowSize = $win }
+} catch {}
 Set-Location $PSScriptRoot
 
 # ---------------------------------------------------------------------------
@@ -61,13 +67,26 @@ function Detect-Gpu {
 # Menu
 # ---------------------------------------------------------------------------
 
+function Get-RunningPid {
+    if (Test-Path ".roma-stt.pid") {
+        $pidVal = (Get-Content ".roma-stt.pid" -ErrorAction SilentlyContinue | Select-Object -First 1).Trim()
+        if ($pidVal -match '^\d+$') {
+            $proc = Get-Process -Id ([int]$pidVal) -ErrorAction SilentlyContinue
+            if ($proc) { return [int]$pidVal }
+        }
+        # pid-файл есть, но процесс мёртв — удаляем зависший файл
+        Remove-Item ".roma-stt.pid" -ErrorAction SilentlyContinue
+    }
+    return $null
+}
+
 function Get-MenuConfig {
     # Одним вызовом Python читаем все нужные для меню значения
-    if (-not (Test-Path ".venv")) { return @{ lang = ""; notif = ""; post = ""; model = ""; hkr = ""; hks = "" } }
-    $raw = & uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); mp=cfg.get('whisper_model_path',''); model=Path(mp).stem if mp else ''; print(cfg.get('language','ru'), cfg.get('notifications', False), cfg.get('postprocess', True), model, cfg.get('hotkey_record','Ctrl+F2'), cfg.get('hotkey_stop','Ctrl+F3'), sep='|')" 2>$null
-    if (-not $raw) { return @{ lang = "ru"; notif = "False"; post = "True"; model = ""; hkr = "Ctrl+F2"; hks = "Ctrl+F3" } }
+    if (-not (Test-Path ".venv")) { return @{ lang = ""; notif = ""; post = ""; model = ""; hkr = ""; hks = ""; module = "" } }
+    $raw = & uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); mp=cfg.get('whisper_model_path',''); model=Path(mp).stem if mp else ''; print(cfg.get('language','ru'), cfg.get('notifications', False), cfg.get('postprocess', True), model, cfg.get('hotkey_record','Ctrl+F2'), cfg.get('hotkey_stop','Ctrl+F3'), cfg.get('module','cpu'), sep='|')" 2>$null
+    if (-not $raw) { return @{ lang = "ru"; notif = "False"; post = "True"; model = ""; hkr = "Ctrl+F2"; hks = "Ctrl+F3"; module = "cpu" } }
     $parts = $raw.Trim().Split('|')
-    return @{ lang = $parts[0]; notif = $parts[1]; post = $parts[2]; model = $parts[3]; hkr = $parts[4]; hks = $parts[5] }
+    return @{ lang = $parts[0]; notif = $parts[1]; post = $parts[2]; model = $parts[3]; hkr = $parts[4]; hks = $parts[5]; module = if ($parts.Count -gt 6) { $parts[6] } else { "cpu" } }
 }
 
 function Show-Menu {
@@ -78,6 +97,11 @@ function Show-Menu {
     $modelVal  = if ($cfg.model) { $cfg.model -replace '^ggml-','' } else { "?" }
     $hkrVal    = if ($cfg.hkr)  { $cfg.hkr }  else { "?" }
     $hksVal    = if ($cfg.hks)  { $cfg.hks }  else { "?" }
+    $modVal    = if ($cfg.module) { $cfg.module } else { "cpu" }
+
+    $runningPid = Get-RunningPid
+    $statusText  = if ($runningPid) { "работает  (PID $runningPid)" } else { "остановлена" }
+    $statusColor = if ($runningPid) { "Green" } else { "DarkGray" }
 
     Clear-Host
     Write-Host ""
@@ -85,6 +109,9 @@ function Show-Menu {
     Write-Host "  " -NoNewline
     Write-Host "Roma-STT" -NoNewline -ForegroundColor Cyan
     Write-Host "  -  Speech to Text (голос в текст)"
+    Write-Host "  Служба: " -NoNewline; Write-Host $statusText -NoNewline -ForegroundColor $statusColor
+    Write-Host "  |  Режим: " -NoNewline; Write-Host $modVal -NoNewline -ForegroundColor Cyan
+    Write-Host "  |  Модель: " -NoNewline; Write-Host $modelVal -ForegroundColor Cyan
     Write-Host " ============================================================" -ForegroundColor DarkGray
     Write-Host ""
     Write-Host "  Введите цифру и нажмите Enter."
@@ -306,8 +333,9 @@ function Do-Start {
         Write-Host "Сначала выполните 1 (Установка)." -ForegroundColor Red
         Pause-Continue; return
     }
-    if (Test-Path ".roma-stt.pid") {
-        Write-Host "Служба уже запущена. Для перезапуска сначала остановите её (пункт 4)." -ForegroundColor Red
+    $runningPid = Get-RunningPid
+    if ($runningPid) {
+        Write-Host "Служба уже запущена (PID $runningPid). Для перезапуска сначала остановите её (пункт 4)." -ForegroundColor Red
         Pause-Continue; return
     }
     $mod = Get-Config "module" "cpu"
@@ -334,10 +362,10 @@ function Do-Start {
         Pause-Continue; return
     }
 
-    & uv run python scripts/check_ready.py *>$null
+    $readyOut = & uv run python scripts/check_ready.py 2>&1
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Проверка готовности не прошла:" -ForegroundColor Red
-        & uv run python scripts/check_ready.py
+        $readyOut | ForEach-Object { Write-Host $_ }
         Write-Host ""
         Write-Host "Сделайте: 1 (Установка), потом 2 (Проверка). Когда в пункте 2 будет OK — снова выберите 3."
         Pause-Continue; return
@@ -345,14 +373,24 @@ function Do-Start {
 
     $hkr = Get-Config "hotkey_record" "Ctrl+F2"
     $hks = Get-Config "hotkey_stop"   "Ctrl+F3"
-    Write-Host "Служба запускается в трее. " -NoNewline -ForegroundColor Green
     Write-Host "Режим: " -NoNewline; Write-Host $mod -NoNewline -ForegroundColor Cyan
     Write-Host ", Запись: " -NoNewline; Write-Host $hkr -NoNewline -ForegroundColor Cyan
     Write-Host ", Стоп: "  -NoNewline; Write-Host $hks -ForegroundColor Cyan
     Write-Host "Остановить: пункт 4. Это окно можно закрыть."
     $pythonw = Join-Path $PSScriptRoot ".venv\Scripts\pythonw.exe"
     Start-Process $pythonw -ArgumentList @("main.py", "--module", $mod) -WorkingDirectory $PSScriptRoot
-    Start-Sleep -Seconds 2
+
+    # Ждём появления pid-файла (до 6 секунд)
+    $waited = 0
+    while (-not (Test-Path ".roma-stt.pid") -and $waited -lt 6) {
+        Start-Sleep -Milliseconds 500
+        $waited += 0.5
+    }
+    if (Test-Path ".roma-stt.pid") {
+        Write-Host "Служба запущена." -ForegroundColor Green
+    } else {
+        Write-Host "Служба не ответила за 6 секунд — возможна ошибка. Проверьте логи." -ForegroundColor Yellow
+    }
     Pause-Continue
 }
 
@@ -443,7 +481,7 @@ function Do-SetLanguage {
         if ($new -eq "english") { Write-Host 'Используйте код "en", а не "english".' -ForegroundColor Red; continue }
         Set-Config "language" $new
         Write-Host "Язык установлен: $new" -ForegroundColor Green
-        Pause-Continue; return
+        Start-Sleep -Seconds 1; return
     }
 }
 
@@ -488,7 +526,7 @@ function Do-ToggleNotifications {
     $newVal = Get-Config "notifications" "False"
     $new = if ($newVal -eq "True") { "включены" } else { "выключены" }
     Write-Host "Уведомления теперь: $new" -ForegroundColor Green
-    Pause-Continue
+    Start-Sleep -Seconds 1
 }
 
 function Do-TogglePostprocess {
@@ -505,7 +543,7 @@ function Do-TogglePostprocess {
     $newVal = Get-Config "postprocess" "True"
     $new = if ($newVal -ne "False") { "включена" } else { "выключена" }
     Write-Host "Постобработка теперь: $new" -ForegroundColor Green
-    Pause-Continue
+    Start-Sleep -Seconds 1
 }
 
 # ---------------------------------------------------------------------------
