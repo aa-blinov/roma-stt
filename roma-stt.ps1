@@ -358,18 +358,27 @@ function Do-Start {
 
 function Do-Stop {
     Write-Host "[4] Остановка Roma-STT..." -ForegroundColor Cyan
+    $stopped = $false
     if (Test-Path ".roma-stt.pid") {
         $pidVal = (Get-Content ".roma-stt.pid" -ErrorAction SilentlyContinue | Select-Object -First 1).Trim()
         if ($pidVal) { Stop-Process -Id ([int]$pidVal) -Force -ErrorAction SilentlyContinue }
         Remove-Item ".roma-stt.pid" -ErrorAction SilentlyContinue
+        $stopped = $true
     } else {
         $pids = & uv run python scripts/find_roma_stt_pids.py 2>$null
         foreach ($p in $pids) {
             $p = $p.Trim()
-            if ($p -match '^\d+$') { Stop-Process -Id ([int]$p) -Force -ErrorAction SilentlyContinue }
+            if ($p -match '^\d+$') {
+                Stop-Process -Id ([int]$p) -Force -ErrorAction SilentlyContinue
+                $stopped = $true
+            }
         }
     }
-    Write-Host "Готово." -ForegroundColor Green
+    if ($stopped) {
+        Write-Host "Служба остановлена." -ForegroundColor Green
+    } else {
+        Write-Host "Служба уже не запущена." -ForegroundColor DarkGray
+    }
     Pause-Continue
 }
 
