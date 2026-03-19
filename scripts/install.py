@@ -17,13 +17,55 @@ def run(cmd: list[str], cwd: Path | None = None) -> bool:
     return r.returncode == 0
 
 
+DEFAULT_CONFIG = {
+    "hotkey_record": "Ctrl+F2",
+    "hotkey_stop": "Ctrl+F3",
+    "input_device": None,
+    "input_device_name": None,
+    "language": "ru",
+    "module": "cpu",
+    "notifications": True,
+    "postprocess": True,
+    "whisper_beam_size": 5,
+    "whisper_best_of": 5,
+    "whisper_cpp_path_amd": "",
+    "whisper_cpp_path_cpu": "bin/main-cpu.exe",
+    "whisper_cpp_path_cuda": "bin/main-cuda.exe",
+    "whisper_model_path": "",
+    "whisper_prompt": "",
+}
+
+
+def ensure_default_config(arch: str = "cpu") -> None:
+    """Create config.yaml with defaults if it doesn't exist; fill missing keys if it does."""
+    import yaml
+
+    config_path = ROOT / "config.yaml"
+    is_new = not config_path.exists()
+    data: dict = {}
+    if not is_new:
+        data = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+    changed = is_new
+    for key, value in DEFAULT_CONFIG.items():
+        if key not in data:
+            data[key] = value
+            changed = True
+    # Always sync module to chosen arch if not already set by user
+    if data.get("module") == "cpu" and arch != "cpu":
+        data["module"] = arch
+        changed = True
+    if changed:
+        config_path.write_text(yaml.dump(data, allow_unicode=True, default_flow_style=False), encoding="utf-8")
+        print(f"config.yaml {'created' if is_new else 'updated'} with defaults.")
+
+
 def download_default_model() -> bool:
-    """Download recommended multilingual model (large-v3-turbo) if models/ is empty."""
+    """Download recommended multilingual model (large-v3) if models/ is empty."""
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     if list(MODELS_DIR.glob("*.bin")) or list(MODELS_DIR.glob("*.ggml")):
         return True
-    print("Downloading default model (large-v3-turbo, multilingual)...")
-    r = subprocess.run([sys.executable, str(ROOT / "scripts" / "download_model.py"), "large-v3-turbo"], cwd=ROOT)
+    print("Downloading default model (large-v3, multilingual)...")
+    r = subprocess.run([sys.executable, str(ROOT / "scripts" / "download_model.py"), "large-v3"], cwd=ROOT)
     if r.returncode != 0:
         return False
     # Set in config if missing
@@ -33,11 +75,11 @@ def download_default_model() -> bool:
 
         data = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
         if not data.get("whisper_model_path"):
-            model_path = MODELS_DIR / "ggml-large-v3-turbo.bin"
+            model_path = MODELS_DIR / "ggml-large-v3.bin"
             if model_path.exists():
                 data["whisper_model_path"] = str(model_path.resolve())
                 config_path.write_text(yaml.dump(data, allow_unicode=True, default_flow_style=False), encoding="utf-8")
-                print("Set whisper_model_path in config.yaml to ggml-large-v3-turbo.bin")
+                print("Set whisper_model_path in config.yaml to ggml-large-v3.bin")
     return True
 
 
@@ -76,6 +118,7 @@ def main() -> int:
     if not run(["uv", "sync"]):
         print("Failed to uv sync")
         return 1
+    ensure_default_config(args.arch)
     build_ok = True
     if not args.no_whisper_build:
         build_ok = build_whisper_cpp(args.arch)
