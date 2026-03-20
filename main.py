@@ -5,19 +5,18 @@ import logging
 import os
 import subprocess
 import threading
-import time
-import winsound
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
 import win32con
 import win32gui
 
+from application.record_and_paste import TranscribeParams, run_transcription_pipeline
 from domain.config_validation import validate_model_path
 from infrastructure.clipboard_paste import paste_text
 from infrastructure.config_repo import load_config, save_config
 from infrastructure.recorder import record_to_wav_until_stopped
-from infrastructure.text_postprocess import postprocess
+from infrastructure.ui_chimes import play_recording_started_chime, play_recording_stopped_chime
 from infrastructure.whisper_cpp_engine import WhisperCppEngine
 from presentation.hotkey import parse_hotkey, register_hotkey
 from presentation.tray_app import create_tray_icon
@@ -254,7 +253,7 @@ def main() -> None:
         # Start recording — один высокий длинный тон
         logger.info("recording started")
         try:
-            winsound.Beep(880, 220)  # один тон — запись началась
+            play_recording_started_chime()
         except Exception:
             pass
         stop_event.clear()
@@ -284,9 +283,7 @@ def main() -> None:
         # Stop recording — два низких «тук-тук»
         logger.info("recording stop requested")
         try:
-            winsound.Beep(330, 100)
-            time.sleep(0.12)
-            winsound.Beep(330, 100)  # два чётких удара — запись остановлена
+            play_recording_stopped_chime()
         except Exception:
             pass
         stop_event.set()
@@ -327,8 +324,7 @@ def main() -> None:
                     vad_ok,
                     wav_path,
                 )
-                text = engine.transcribe(
-                    wav_path,
+                params = TranscribeParams(
                     language=lang,
                     n_gpu_layers=gpu_layers,
                     beam_size=beam_size,
@@ -337,7 +333,12 @@ def main() -> None:
                     use_vad=use_vad,
                     vad_model_path=vad_abs if vad_rel else None,
                 )
-                text = postprocess(text)
+                text = run_transcription_pipeline(
+                    engine=engine,
+                    wav_path=wav_path,
+                    params=params,
+                    paste_fn=paste_text,
+                )
                 length = len(text) if text else 0
                 preview = (text[:80] + "…") if text and len(text) > 80 else (text or "")
                 logger.info("transcribe done | length=%d preview=%r", length, preview)
@@ -345,7 +346,7 @@ def main() -> None:
                     logger.warning("transcribe empty result")
                     _notify("Ничего не распознано — говорите чётко, подольше; проверьте микрофон")
                 else:
-                    paste_text(text)
+                    # Вставка уже выполнена внутри run_transcription_pipeline (paste_fn=paste_text)
                     logger.info("paste done | length=%d", length)
                     _notify("Текст вставлен")
             except (FileNotFoundError, subprocess.CalledProcessError) as e:

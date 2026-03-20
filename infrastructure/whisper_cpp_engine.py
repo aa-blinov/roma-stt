@@ -3,6 +3,7 @@
 import logging
 import subprocess
 from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +36,7 @@ class WhisperCppEngine:
         prompt: str = "",
         use_vad: bool = True,
         vad_model_path: str | None = None,
+        **_kw: Any,
     ) -> str:
         """Run whisper.cpp: -m model -f audio.wav -nt -l lang [options], return stdout as text.
         If the binary does not support -ngl (e.g. CPU-only build), retries without -ngl.

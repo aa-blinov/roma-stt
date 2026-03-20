@@ -81,6 +81,49 @@ function Get-RunningPid {
     return $null
 }
 
+function Test-CommandLineIsRomaSttService {
+    param([int]$ProcessId)
+    try {
+        $wp = Get-CimInstance -ClassName Win32_Process -Filter "ProcessId = $ProcessId" -ErrorAction SilentlyContinue
+        if (-not $wp) { return $false }
+        $cmd = [string]$wp.CommandLine
+        if ($cmd -notmatch 'main\.py') { return $false }
+        if ($cmd -match 'roma-stt|roma_stt') { return $true }
+        if ($PSScriptRoot -and ($cmd.IndexOf($PSScriptRoot, [StringComparison]::OrdinalIgnoreCase) -ge 0)) { return $true }
+        return $false
+    } catch {
+        return $false
+    }
+}
+
+function Get-RomaSttPidsFromPythonScan {
+    $ids = New-Object System.Collections.Generic.List[int]
+    try {
+        $lines = & uv run python scripts/find_roma_stt_pids.py 2>$null
+        if ($lines) {
+            foreach ($line in $lines) {
+                $t = [string]$line.Trim()
+                if ($t -match '^\d+$') { $ids.Add([int]$t) }
+            }
+        }
+    } catch { }
+    return $ids
+}
+
+function Stop-RomaSttProcessWithWait {
+    param([int]$ProcessId, [int]$MaxWaitMs = 4500)
+    if (-not (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue)) { return $true }
+    Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    while ($sw.ElapsedMilliseconds -lt $MaxWaitMs) {
+        if (-not (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue)) {
+            return $true
+        }
+        Start-Sleep -Milliseconds 160
+    }
+    return (-not (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue))
+}
+
 function Get-ReadinessSummary {
     # Компактная строка для шапки меню (scripts/check_ready.py --summary)
     if (-not (Test-Path ".venv")) {
@@ -153,26 +196,26 @@ function Show-Menu {
     }
     Write-Host " ============================================================" -ForegroundColor DarkGray
     Write-Host "  Введите цифру и нажмите Enter."
-    Write-Host "  Первый запуск: 1, затем 2. Пункт 1  -  также обновление и удаление установки." -ForegroundColor Yellow
+    Write-Host "  Первый запуск — пункт 1, затем 2" -ForegroundColor Yellow
     Write-Host "  " -NoNewline; Write-Host " 1." -NoNewline -ForegroundColor Yellow; Write-Host " Установка / переустановка / удаление"
-    Write-Host "     Первый раз  -  полная установка. Уже есть .venv  -  обновить или удалить." -ForegroundColor DarkGray
+    Write-Host "     Первый раз  -  полная установка или обновление/удаление установки" -ForegroundColor DarkGray
     Write-Host "  " -NoNewline; Write-Host " 2." -NoNewline -ForegroundColor Yellow; Write-Host " Запустить службу (в трее)"
-    Write-Host "     Режим и горячая клавиша из config.yaml." -ForegroundColor DarkGray
+    Write-Host "     Режим и горячая клавиша из config.yaml" -ForegroundColor DarkGray
     Write-Host "  " -NoNewline; Write-Host " 3." -NoNewline -ForegroundColor Yellow; Write-Host " Остановить службу"
-    Write-Host "     Завершить работу Roma-STT в трее." -ForegroundColor DarkGray
+    Write-Host "     Завершить работу Roma-STT в трее" -ForegroundColor DarkGray
     Write-Host " --- Настройки (после изменений: 3 -> 2) ---------------------" -ForegroundColor DarkGray
     Write-Host "  " -NoNewline; Write-Host " 4." -NoNewline -ForegroundColor Yellow; Write-Host " Модели распознавания       " -NoNewline; Write-Host "[$modelVal]" -ForegroundColor Cyan
-    Write-Host "     Список моделей  -  выбрать или скачать и выбрать." -ForegroundColor DarkGray
+    Write-Host "     Список моделей  -  выбрать или скачать и выбрать" -ForegroundColor DarkGray
     Write-Host "  " -NoNewline; Write-Host " 5." -NoNewline -ForegroundColor Yellow; Write-Host " Подбор свободной горячей клавиши"
-    Write-Host "     Протестировать F-клавиши и записать в config.yaml." -ForegroundColor DarkGray
+    Write-Host "     Протестировать F-клавиши и записать в config.yaml" -ForegroundColor DarkGray
     Write-Host "  " -NoNewline; Write-Host " 6." -NoNewline -ForegroundColor Yellow; Write-Host " Горячая клавиша записи     " -NoNewline; Write-Host "[$hkrVal]" -ForegroundColor Cyan
-    Write-Host "     Клавиша для начала записи голоса." -ForegroundColor DarkGray
+    Write-Host "     Клавиша для начала записи голоса" -ForegroundColor DarkGray
     Write-Host "  " -NoNewline; Write-Host " 7." -NoNewline -ForegroundColor Yellow; Write-Host " Горячая клавиша стопа      " -NoNewline; Write-Host "[$hksVal]" -ForegroundColor Cyan
-    Write-Host "     Клавиша для остановки записи." -ForegroundColor DarkGray
+    Write-Host "     Клавиша для остановки записи" -ForegroundColor DarkGray
     Write-Host "  " -NoNewline; Write-Host " 8." -NoNewline -ForegroundColor Yellow; Write-Host " Язык распознавания         " -NoNewline; Write-Host "[$langVal]" -ForegroundColor Cyan
     Write-Host "     Код языка ISO 639-1: ru, en, de, fr, es, it, zh..." -ForegroundColor DarkGray
     Write-Host "  " -NoNewline; Write-Host " 9." -NoNewline -ForegroundColor Yellow; Write-Host " Устройство ввода (микрофон)"
-    Write-Host "     Выбрать микрофон из списка устройств." -ForegroundColor DarkGray
+    Write-Host "     Выбрать микрофон из списка устройств" -ForegroundColor DarkGray
     Write-Host "  " -NoNewline; Write-Host "10." -NoNewline -ForegroundColor Yellow; Write-Host " Выход"
     Write-Host ""
 }
@@ -445,26 +488,47 @@ function Do-Start {
 
 function Do-Stop {
     Write-Host "[3] Остановка Roma-STT..." -ForegroundColor Cyan
-    $stopped = $false
+
+    # Раньше: только PID из файла ИЛИ только скан Python — при сбое Stop-Process файл всё равно
+    # удалялся, и со второго раза срабатывал fallback. Теперь всегда объединяем оба источника,
+    # проверяем командную строку (не чужой процесс) и ждём завершения.
+    $toStop = New-Object 'System.Collections.Generic.HashSet[int]'
+
     if (Test-Path ".roma-stt.pid") {
-        $pidVal = (Get-Content ".roma-stt.pid" -ErrorAction SilentlyContinue | Select-Object -First 1).Trim()
-        if ($pidVal) { Stop-Process -Id ([int]$pidVal) -Force -ErrorAction SilentlyContinue }
-        Remove-Item ".roma-stt.pid" -ErrorAction SilentlyContinue
-        $stopped = $true
-    } else {
-        $pids = & uv run python scripts/find_roma_stt_pids.py 2>$null
-        foreach ($p in $pids) {
-            $p = $p.Trim()
-            if ($p -match '^\d+$') {
-                Stop-Process -Id ([int]$p) -Force -ErrorAction SilentlyContinue
-                $stopped = $true
+        $raw = (Get-Content ".roma-stt.pid" -ErrorAction SilentlyContinue | Select-Object -First 1)
+        $pidStr = if ($null -ne $raw) { [string]$raw.Trim() } else { "" }
+        if ($pidStr -match '^\d+$') {
+            $candidate = [int]$pidStr
+            if (Test-CommandLineIsRomaSttService -ProcessId $candidate) {
+                [void]$toStop.Add($candidate)
             }
         }
     }
-    if ($stopped) {
+
+    foreach ($scanPid in (Get-RomaSttPidsFromPythonScan)) {
+        [void]$toStop.Add($scanPid)
+    }
+
+    if ($toStop.Count -eq 0) {
+        Remove-Item ".roma-stt.pid" -ErrorAction SilentlyContinue
+        Write-Host "Запущенный Roma-STT не найден — останавливать нечего" -ForegroundColor DarkGray
+        Pause-Continue
+        return
+    }
+
+    $anyStopped = $false
+    foreach ($procId in $toStop) {
+        if (Stop-RomaSttProcessWithWait -ProcessId $procId) {
+            $anyStopped = $true
+        }
+    }
+
+    Remove-Item ".roma-stt.pid" -ErrorAction SilentlyContinue
+
+    if ($anyStopped) {
         Write-Host "Служба остановлена." -ForegroundColor Green
     } else {
-        Write-Host "Служба уже не запущена." -ForegroundColor DarkGray
+        Write-Host "Процесс не завершился за отведённое время. Повторите пункт 3 или снимите задачу вручную." -ForegroundColor Yellow
     }
     Pause-Continue
 }

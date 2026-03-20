@@ -1,4 +1,4 @@
-"""Infrastructure: recorder — WAV 16 kHz mono."""
+"""Infrastructure: recorder — WAV (native rate in stop mode; fixed rate in timed helper)."""
 
 import tempfile
 from pathlib import Path
@@ -9,13 +9,12 @@ import numpy as np
 import sounddevice as sd
 
 from infrastructure.recorder import (
-    CHUNK_SEC,
+    BLOCKSIZE,
     RECORD_CHANNELS,
     RECORD_RATE,
     record_to_wav,
     record_to_wav_until_stopped,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -28,20 +27,20 @@ def _make_stream_cls(chunks: int, stop: Event, error_with_device: bool = False):
     If error_with_device=True, raises PortAudioError when 'device' kwarg present
     (simulates invalid-device error), and succeeds on the fallback call.
     """
-    blocksize = int(CHUNK_SEC * RECORD_RATE)
-    fake_data = np.zeros((blocksize, RECORD_CHANNELS), dtype=np.float32)
 
     class FakeStream:
         def __init__(self, **kwargs):
             self._cb = kwargs.get("callback")
             self._has_device = "device" in kwargs
+            self._blocksize = int(kwargs.get("blocksize", BLOCKSIZE))
+            self._fake_data = np.zeros((self._blocksize, RECORD_CHANNELS), dtype=np.float32)
 
         def __enter__(self):
             if error_with_device and self._has_device:
                 raise sd.PortAudioError("Invalid device [-9996]")
             for _ in range(chunks):
                 if self._cb:
-                    self._cb(fake_data, blocksize, None, None)
+                    self._cb(self._fake_data, self._blocksize, None, None)
             stop.set()
             return self
 
@@ -79,7 +78,8 @@ def test_record_constants():
 # ---------------------------------------------------------------------------
 
 
-def test_record_until_stopped_creates_wav():
+@patch("infrastructure.recorder._device_native_rate", return_value=16000)
+def test_record_until_stopped_creates_wav(_mock_native):
     """Stop before any chunks — should still produce a valid (silent) WAV file."""
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "out.wav"
@@ -92,7 +92,8 @@ def test_record_until_stopped_creates_wav():
         assert path.stat().st_size >= 44  # at least WAV header
 
 
-def test_record_until_stopped_collects_chunks():
+@patch("infrastructure.recorder._device_native_rate", return_value=16000)
+def test_record_until_stopped_collects_chunks(_mock_native):
     """Three chunks → WAV must be larger than the minimal silent placeholder."""
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "out.wav"
@@ -105,7 +106,8 @@ def test_record_until_stopped_collects_chunks():
         assert path.stat().st_size > 44  # real audio data present
 
 
-def test_record_until_stopped_device_fallback():
+@patch("infrastructure.recorder._device_native_rate", return_value=16000)
+def test_record_until_stopped_device_fallback(_mock_native):
     """Invalid device (-9996) → retry without device, set fallback_used[0]=True."""
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "out.wav"
@@ -122,7 +124,8 @@ def test_record_until_stopped_device_fallback():
         assert path.exists()
 
 
-def test_record_until_stopped_no_fallback_without_device():
+@patch("infrastructure.recorder._device_native_rate", return_value=16000)
+def test_record_until_stopped_no_fallback_without_device(_mock_native):
     """PortAudioError with device=None must propagate (no fallback possible)."""
 
     class ErrorStream:

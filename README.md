@@ -94,3 +94,7 @@ Repair-WinGetPackageManager -AllUsers
 ```bash
 uv run pytest tests/ -v
 ```
+
+Юнит-тесты для CLI в `scripts/` — в [`tests/unit/scripts/`](tests/unit/scripts/). Общие фикстуры (`project_root`, `roma_tmp_layout`, `write_yaml_config`, …) и добавление `scripts/` в `sys.path` — в [`tests/conftest.py`](tests/conftest.py).
+
+При push/PR в ветки `main` или `master` в GitHub Actions выполняется та же проверка (**Windows**, `uv sync --frozen` + `pytest`). Файл: [`.github/workflows/ci.yml`](.github/workflows/ci.yml).

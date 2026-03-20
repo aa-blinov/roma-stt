@@ -112,7 +112,10 @@ def use_by_number(num_or_name: str) -> None:
         try:
             num = int(s)
         except ValueError:
-            print("Введите номер (1–8) или название модели (например base, large-v3-turbo).")
+            print(
+                f"Введите номер (1–{len(ORDERED_NAMES)}) или название модели "
+                "(например base, large-v3-turbo)."
+            )
             sys.exit(1)
         if num < 1 or num > len(ORDERED_NAMES):
             print(f"Номер должен быть от 1 до {len(ORDERED_NAMES)}.")
