@@ -20,7 +20,11 @@ def check_whisper_exe(exe_path: str | Path) -> tuple[bool, str]:
             timeout=10,
             cwd=str(exe.parent),
         )
-        if r.returncode == 0 or "usage" in (r.stdout or "").lower() or "usage" in (r.stderr or "").lower():
+        if (
+            r.returncode == 0
+            or "usage" in (r.stdout or "").lower()
+            or "usage" in (r.stderr or "").lower()
+        ):
             return True, f"whisper.cpp: OK ({exe.name})"
         return False, f"whisper.cpp: unexpected exit {r.returncode}"
     except FileNotFoundError:
@@ -43,7 +47,9 @@ def main() -> int:
     key = f"whisper_cpp_path_{module}"
     exe = data.get(key) or data.get("whisper_cpp_path_cpu", "")
     if not exe:
-        print("  Set whisper_cpp_path_cpu (or cuda/amd) in config.yaml to your whisper main.exe path.")
+        print(
+            "  Set whisper_cpp_path_cpu (or cuda/amd) in config.yaml to your whisper main.exe path."
+        )
         print("  Build from: https://github.com/ggml-org/whisper.cpp")
         return 1
     ok, msg = check_whisper_exe(exe)

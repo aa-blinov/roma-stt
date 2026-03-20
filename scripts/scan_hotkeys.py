@@ -184,7 +184,9 @@ def main() -> int:
     if ns is not None:
         cfg["hotkey_stop"] = free[ns - 1]
     save_config(cfg)
-    print(f'Готово. В config.yaml: hotkey_record: "{cfg["hotkey_record"]}", hotkey_stop: "{cfg["hotkey_stop"]}"')
+    print(
+        f'Готово. В config.yaml: hotkey_record: "{cfg["hotkey_record"]}", hotkey_stop: "{cfg["hotkey_stop"]}"'
+    )
     print("Запустите программу (пункт 3), чтобы применить.")
     return 0
 

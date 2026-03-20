@@ -45,7 +45,9 @@ def _probe_hotkey_in_process(wanted: str, hotkey_id: int = 1) -> str | None:
             win32gui.RegisterClass(wndclass)
         except Exception:
             pass
-        hwnd = win32gui.CreateWindow("RomaSTT_Probe", "Probe", 0, 0, 0, 0, 0, 0, 0, wndclass.hInstance, None)
+        hwnd = win32gui.CreateWindow(
+            "RomaSTT_Probe", "Probe", 0, 0, 0, 0, 0, 0, 0, wndclass.hInstance, None
+        )
         if not hwnd:
             return
         candidates = [wanted] + [c for c in _HOTKEY_FALLBACKS if c != wanted]
@@ -146,7 +148,9 @@ def _resolve_input_device(config: dict, logger: logging.Logger) -> int | None:
                 # Name mismatch — index drifted, fall through to name search
                 logger.info(
                     "input device index %d name changed: saved=%r current=%r — searching by name",
-                    idx, saved_name, current_name,
+                    idx,
+                    saved_name,
+                    current_name,
                 )
         except (IndexError, TypeError, ValueError):
             logger.info("input device index %s out of range — searching by name", saved_index)
@@ -157,7 +161,12 @@ def _resolve_input_device(config: dict, logger: logging.Logger) -> int | None:
             if not isinstance(dev, dict):
                 continue
             if dev.get("max_input_channels", 0) > 0 and dev.get("name") == saved_name:
-                logger.info("input device found by name %r at new index %d (was %s)", saved_name, i, saved_index)
+                logger.info(
+                    "input device found by name %r at new index %d (was %s)",
+                    saved_name,
+                    i,
+                    saved_index,
+                )
                 config["input_device"] = i
                 config["input_device_name"] = saved_name
                 return i
@@ -165,7 +174,8 @@ def _resolve_input_device(config: dict, logger: logging.Logger) -> int | None:
     # --- 3. Not found ---
     logger.warning(
         "input device not found: index=%s name=%r — falling back to system default",
-        saved_index, saved_name,
+        saved_index,
+        saved_name,
     )
     config["input_device"] = None
     config["input_device_name"] = None
@@ -174,7 +184,9 @@ def _resolve_input_device(config: dict, logger: logging.Logger) -> int | None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Roma-STT: Speech-to-Text tray app (Windows)")
-    parser.add_argument("--module", choices=["cpu", "cuda", "amd"], default="cpu", help="STT module")
+    parser.add_argument(
+        "--module", choices=["cpu", "cuda", "amd"], default="cpu", help="STT module"
+    )
     args = parser.parse_args()
     config_path = get_config_path()
     log_dir = config_path.parent / "logs"
@@ -220,7 +232,9 @@ def main() -> None:
     stop_event = threading.Event()
     record_thread: threading.Thread | None = None
     wav_path: str | None = None
-    fallback_used: list = [False]  # recorder sets True if device was invalid and fell back to default
+    fallback_used: list = [
+        False
+    ]  # recorder sets True if device was invalid and fell back to default
     vad_missing_logged: list = [False]  # one warning if whisper_vad on but model file absent
     pid_file = get_config_path().parent / ".roma-stt.pid"
 
@@ -378,7 +392,9 @@ def main() -> None:
         wndclass.lpszClassName = "RomaSTT"
         wndclass.hInstance = win32gui.GetModuleHandle(None)
         win32gui.RegisterClass(wndclass)
-        hwnd = win32gui.CreateWindow("RomaSTT", "Roma-STT", 0, 0, 0, 0, 0, 0, 0, wndclass.hInstance, None)
+        hwnd = win32gui.CreateWindow(
+            "RomaSTT", "Roma-STT", 0, 0, 0, 0, 0, 0, 0, wndclass.hInstance, None
+        )
         record_str = config.get("hotkey_record") or "Ctrl+F2"
         stop_str = config.get("hotkey_stop") or "Ctrl+F3"
         fallbacks = (
@@ -427,7 +443,11 @@ def main() -> None:
             logger.error("hotkey registration failed, exiting")
             print("Не удалось зарегистрировать горячие клавиши. Выход.")
             os._exit(1)
-        logger.info("hotkeys registered | record=%s stop=%s", config.get("hotkey_record"), config.get("hotkey_stop"))
+        logger.info(
+            "hotkeys registered | record=%s stop=%s",
+            config.get("hotkey_record"),
+            config.get("hotkey_stop"),
+        )
         win32gui.PumpMessages()
 
     hotkey_thread = threading.Thread(target=run_hotkey_loop, daemon=True)

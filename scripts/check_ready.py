@@ -119,6 +119,7 @@ def main() -> int:
     # Всегда показывать модуль из конфига и статус CUDA (nvcc)
     try:
         import yaml
+
         config_path = ROOT / "config.yaml"
         module = "cpu"
         if config_path.exists():

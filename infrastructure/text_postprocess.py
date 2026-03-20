@@ -101,21 +101,23 @@ _RU_EXACT_HALLUCINATION_PHRASES_LOWER: frozenset[str] = frozenset(
 )
 
 # Tokens that Whisper emits when it detects no speech or non-speech audio.
-_SILENCE_TOKENS: frozenset[str] = frozenset({
-    "[blank_audio]",
-    "[silence]",
-    "[music]",
-    "[applause]",
-    "[noise]",
-    "[смех]",
-    "(смех)",
-    "[музыка]",
-    "(музыка)",
-    "[тихо]",
-    "(тихо)",
-    "[аплодисменты]",
-    "(аплодисменты)",
-})
+_SILENCE_TOKENS: frozenset[str] = frozenset(
+    {
+        "[blank_audio]",
+        "[silence]",
+        "[music]",
+        "[applause]",
+        "[noise]",
+        "[смех]",
+        "(смех)",
+        "[музыка]",
+        "(музыка)",
+        "[тихо]",
+        "(тихо)",
+        "[аплодисменты]",
+        "(аплодисменты)",
+    }
+)
 
 # Trailing punctuation that already terminates a sentence — don't add a period.
 _SENTENCE_ENDINGS = frozenset(".?!…")

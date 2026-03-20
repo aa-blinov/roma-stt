@@ -56,7 +56,9 @@ def ensure_default_config(arch: str = "cpu") -> None:
         data["module"] = arch
         changed = True
     if changed:
-        config_path.write_text(yaml.dump(data, allow_unicode=True, default_flow_style=False), encoding="utf-8")
+        config_path.write_text(
+            yaml.dump(data, allow_unicode=True, default_flow_style=False), encoding="utf-8"
+        )
         print(f"config.yaml {'created' if is_new else 'updated'} with defaults.")
 
 
@@ -66,7 +68,9 @@ def download_default_model() -> bool:
     if list(MODELS_DIR.glob("*.bin")) or list(MODELS_DIR.glob("*.ggml")):
         return True
     print("Downloading default model (large-v3, multilingual)...")
-    r = subprocess.run([sys.executable, str(ROOT / "scripts" / "download_model.py"), "large-v3"], cwd=ROOT)
+    r = subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "download_model.py"), "large-v3"], cwd=ROOT
+    )
     if r.returncode != 0:
         return False
     # Set in config if missing
@@ -79,14 +83,18 @@ def download_default_model() -> bool:
             model_path = MODELS_DIR / "ggml-large-v3.bin"
             if model_path.exists():
                 data["whisper_model_path"] = str(model_path.resolve())
-                config_path.write_text(yaml.dump(data, allow_unicode=True, default_flow_style=False), encoding="utf-8")
+                config_path.write_text(
+                    yaml.dump(data, allow_unicode=True, default_flow_style=False), encoding="utf-8"
+                )
                 print("Set whisper_model_path in config.yaml to ggml-large-v3.bin")
     return True
 
 
 def build_whisper_cpp(arch: str = "cpu") -> bool:
     """Clone/pull, build whisper.cpp, copy to bin/. Returns True on success."""
-    r = subprocess.run([sys.executable, str(ROOT / "scripts" / "build_whisper_cpp.py"), "--arch", arch], cwd=ROOT)
+    r = subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "build_whisper_cpp.py"), "--arch", arch], cwd=ROOT
+    )
     return r.returncode == 0
 
 
@@ -94,16 +102,26 @@ def check_build() -> None:
     """Run check_build.py to verify whisper.cpp exe if path is set."""
     r = subprocess.run([sys.executable, str(ROOT / "scripts" / "check_build.py")], cwd=ROOT)
     if r.returncode != 0:
-        print("Tip: install Git and CMake and Visual Studio Build Tools, then run Install again to build whisper.cpp.")
+        print(
+            "Tip: install Git and CMake and Visual Studio Build Tools, then run Install again to build whisper.cpp."
+        )
 
 
 def main() -> int:
     os.chdir(ROOT)
     parser = argparse.ArgumentParser()
-    parser.add_argument("--arch", choices=["cpu", "cuda", "amd"], default="cpu", help="Target architecture")
-    parser.add_argument("--no-download", action="store_true", help="Skip downloading default model and VAD model")
-    parser.add_argument("--no-whisper-build", action="store_true", help="Skip automatic whisper.cpp clone and build")
-    parser.add_argument("--no-build-check", action="store_true", help="Skip whisper.cpp build check")
+    parser.add_argument(
+        "--arch", choices=["cpu", "cuda", "amd"], default="cpu", help="Target architecture"
+    )
+    parser.add_argument(
+        "--no-download", action="store_true", help="Skip downloading default model and VAD model"
+    )
+    parser.add_argument(
+        "--no-whisper-build", action="store_true", help="Skip automatic whisper.cpp clone and build"
+    )
+    parser.add_argument(
+        "--no-build-check", action="store_true", help="Skip whisper.cpp build check"
+    )
     args = parser.parse_args()
     if not run(["uv", "python", "install", "3.12"]):
         print("Failed to ensure Python 3.12 via uv.")

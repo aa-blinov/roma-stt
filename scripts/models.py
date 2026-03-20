@@ -5,19 +5,18 @@ import subprocess
 import sys
 from pathlib import Path
 
+from whisper_models import MODEL_DESCRIPTIONS, ORDERED_MODEL_KEYS
+
 ROOT = Path(__file__).resolve().parent.parent
 MODELS_DIR = ROOT / "models"
 CONFIG_PATH = ROOT / "config.yaml"
-
-# Манифест и порядок номеров — единый источник whisper_models.py
-from whisper_models import MODEL_DESCRIPTIONS, ORDERED_MODEL_KEYS
 
 MODELS_MANIFEST = {k: MODEL_DESCRIPTIONS[k] for k in ORDERED_MODEL_KEYS}
 ORDERED_NAMES = list(ORDERED_MODEL_KEYS)
 
 # ANSI (Windows 10+ cmd/PowerShell поддерживают)
 _GREEN = "\033[32m"  # скачана
-_GRAY = "\033[90m"   # нет
+_GRAY = "\033[90m"  # нет
 _RESET = "\033[0m"
 
 
@@ -70,14 +69,21 @@ def _write_config_path(path: Path) -> None:
         config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8")) or {}
     config["whisper_model_path"] = str(path.resolve())
     CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    CONFIG_PATH.write_text(yaml.dump(config, allow_unicode=True, default_flow_style=False), encoding="utf-8")
+    CONFIG_PATH.write_text(
+        yaml.dump(config, allow_unicode=True, default_flow_style=False), encoding="utf-8"
+    )
 
 
 def _path_for_model_name(name: str) -> Path | None:
     """Путь к файлу модели по имени из манифеста (если скачана)."""
     if not MODELS_DIR.is_dir():
         return None
-    for stem, ext in [(f"ggml-{name}", ".bin"), (f"ggml-{name}", ".ggml"), (name, ".bin"), (name, ".ggml")]:
+    for stem, ext in [
+        (f"ggml-{name}", ".bin"),
+        (f"ggml-{name}", ".ggml"),
+        (name, ".bin"),
+        (name, ".ggml"),
+    ]:
         p = MODELS_DIR / f"{stem}{ext}"
         if p.exists():
             return p

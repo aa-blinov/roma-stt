@@ -9,7 +9,6 @@ import array
 import io
 import math
 import wave
-
 import winsound
 
 _SAMPLE_RATE = 44100

@@ -80,14 +80,22 @@ class WhisperCppEngine:
         result = self._run_whisper(args_with_gpu)
         used_ngl = n_gpu_layers > 0
 
-        if used_ngl and (result.returncode != 0 or not (result.stdout or "").strip()) and is_ngl_unsupported(result.stderr or ""):
+        if (
+            used_ngl
+            and (result.returncode != 0 or not (result.stdout or "").strip())
+            and is_ngl_unsupported(result.stderr or "")
+        ):
             logger.warning("whisper binary does not support -ngl, running without GPU layers")
             result = self._run_whisper(base_args)
 
         result.check_returncode()
         text = (result.stdout or "").strip()
 
-        if not text and (result.stderr or "").strip() and not is_ngl_unsupported(result.stderr or ""):
+        if (
+            not text
+            and (result.stderr or "").strip()
+            and not is_ngl_unsupported(result.stderr or "")
+        ):
             logger.warning(
                 "whisper empty stdout (check CUDA/audio) | stderr=%s",
                 (result.stderr or "").strip()[:500],

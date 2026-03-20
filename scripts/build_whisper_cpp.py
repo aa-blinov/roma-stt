@@ -34,6 +34,7 @@ def _find_vulkan_sdk() -> str | None:
             return str(candidates[0])
     return None
 
+
 _VS_GEN_MAP = {
     "17": "Visual Studio 17 2022",
     "16": "Visual Studio 16 2019",
@@ -50,18 +51,27 @@ def _find_vs_generator() -> str | None:
     if not _VSWHERE.exists():
         return None
     for extra in (
-        ["-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
-         "-products", "Microsoft.VisualStudio.Product.Enterprise",
-                      "Microsoft.VisualStudio.Product.Professional",
-                      "Microsoft.VisualStudio.Product.Community"],
-        ["-products", "Microsoft.VisualStudio.Product.Enterprise",
-                      "Microsoft.VisualStudio.Product.Professional",
-                      "Microsoft.VisualStudio.Product.Community"],
+        [
+            "-requires",
+            "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+            "-products",
+            "Microsoft.VisualStudio.Product.Enterprise",
+            "Microsoft.VisualStudio.Product.Professional",
+            "Microsoft.VisualStudio.Product.Community",
+        ],
+        [
+            "-products",
+            "Microsoft.VisualStudio.Product.Enterprise",
+            "Microsoft.VisualStudio.Product.Professional",
+            "Microsoft.VisualStudio.Product.Community",
+        ],
     ):
         try:
             r = subprocess.run(
                 [str(_VSWHERE), "-latest", *extra, "-property", "installationVersion"],
-                capture_output=True, text=True, timeout=15,
+                capture_output=True,
+                text=True,
+                timeout=15,
             )
             version = r.stdout.strip()
             if version:
@@ -85,7 +95,9 @@ def _find_vcvarsall() -> Path | None:
         try:
             r = subprocess.run(
                 [str(_VSWHERE), "-latest", "-products", "*", "-property", "installationPath"],
-                capture_output=True, text=True, timeout=15,
+                capture_output=True,
+                text=True,
+                timeout=15,
             )
             install_path = r.stdout.strip()
             if install_path:
@@ -138,8 +150,7 @@ def _run_vcvarsall(cmd: list[str], cwd: Path) -> tuple[bool, str]:
     if not vcvarsall:
         return False, "vcvarsall.bat not found — install Visual Studio Build Tools"
     wrapped = f'call "{vcvarsall}" x64 2>&1 && {subprocess.list2cmdline(cmd)}'
-    r = subprocess.run(["cmd", "/c", wrapped], cwd=cwd,
-                       capture_output=True, text=True, timeout=600)
+    r = subprocess.run(["cmd", "/c", wrapped], cwd=cwd, capture_output=True, text=True, timeout=600)
     return r.returncode == 0, (r.stdout or "") + (r.stderr or "")
 
 
@@ -147,17 +158,23 @@ def check_tools() -> tuple[bool, str]:
     """Require git and cmake. Return (False, msg) if something is missing."""
     ok, _ = run(["git", "--version"], cwd=ROOT, capture=True)
     if not ok:
-        return False, ("Git not found. Install it (e.g. winget install Git.Git) and run Install again.")
+        return False, (
+            "Git not found. Install it (e.g. winget install Git.Git) and run Install again."
+        )
     ok, _ = run(["cmake", "--version"], cwd=ROOT, capture=True)
     if not ok:
-        return False, ("CMake not found. Install it (e.g. winget install Kitware.CMake) and run Install again.")
+        return False, (
+            "CMake not found. Install it (e.g. winget install Kitware.CMake) and run Install again."
+        )
     return True, ""
 
 
 def clone_or_pull() -> tuple[bool, str]:
     if not WHISPER_DIR.exists():
         print("Cloning whisper.cpp...")
-        ok, out = run(["git", "clone", "--depth", "1", REPO_URL, str(WHISPER_DIR)], cwd=ROOT, capture=True)
+        ok, out = run(
+            ["git", "clone", "--depth", "1", REPO_URL, str(WHISPER_DIR)], cwd=ROOT, capture=True
+        )
         if not ok:
             return False, f"git clone failed: {out}"
         print("Cloned.")
@@ -179,7 +196,9 @@ def _no_compiler_hint() -> str:
     # Check if Build Tools IS installed but without the C++ workload (vcvarsall absent)
     vswhere_path = getattr(_find_vcvarsall, "_vswhere_path", None)
     if vswhere_path and not str(vswhere_path).startswith("<"):
-        vs_installer = Path("C:/Program Files (x86)/Microsoft Visual Studio/Installer/vs_installer.exe")
+        vs_installer = Path(
+            "C:/Program Files (x86)/Microsoft Visual Studio/Installer/vs_installer.exe"
+        )
         cmd = (
             f'"{vs_installer}" modify'
             f' --installPath "{vswhere_path}"'
@@ -214,7 +233,8 @@ def build(arch: str = "cpu") -> tuple[bool, str]:
     print(f"Configuring whisper.cpp (cmake) for {arch}...")
     base_cmake = [
         "cmake",
-        "-B", f"build-{arch}",
+        "-B",
+        f"build-{arch}",
         "-DWHISPER_BUILD_EXAMPLES=ON",
         "-DWHISPER_BUILD_TESTS=OFF",
     ]
@@ -231,7 +251,9 @@ def build(arch: str = "cpu") -> tuple[bool, str]:
             # -DVULKAN_SDK is NOT the right variable name; use -DVulkan_ROOT
             base_cmake.append(f"-DVulkan_ROOT={vulkan_sdk}")
         else:
-            print("  [amd] Vulkan SDK NOT found — install via menu item 1 or: winget install KhronosGroup.VulkanSDK")
+            print(
+                "  [amd] Vulkan SDK NOT found — install via menu item 1 or: winget install KhronosGroup.VulkanSDK"
+            )
 
     # Build strategy (tried in order):
     # A. cl.exe in PATH (Developer Command Prompt) → Ninja, single-config
@@ -244,8 +266,11 @@ def build(arch: str = "cpu") -> tuple[bool, str]:
     if _compiler_in_path():
         # A: already in Developer Prompt — Ninja is fastest
         print("  [build] Strategy A: cl.exe in PATH, using Ninja")
-        ok, out = run(base_cmake + ["-G", "Ninja", "-DCMAKE_BUILD_TYPE=Release"],
-                      cwd=WHISPER_DIR, capture=True)
+        ok, out = run(
+            base_cmake + ["-G", "Ninja", "-DCMAKE_BUILD_TYPE=Release"],
+            cwd=WHISPER_DIR,
+            capture=True,
+        )
         if not ok:
             ok, out = run(base_cmake, cwd=WHISPER_DIR, capture=True)
             multi_config = ok
@@ -255,8 +280,7 @@ def build(arch: str = "cpu") -> tuple[bool, str]:
         if vs_gen:
             # B: VS IDE — multi-config generator, no vcvarsall needed
             print(f"  [build] Strategy B: VS IDE generator ({vs_gen})")
-            ok, out = run(base_cmake + ["-G", vs_gen, "-A", "x64"],
-                          cwd=WHISPER_DIR, capture=True)
+            ok, out = run(base_cmake + ["-G", vs_gen, "-A", "x64"], cwd=WHISPER_DIR, capture=True)
             if ok:
                 multi_config = True
 
@@ -287,12 +311,22 @@ def build(arch: str = "cpu") -> tuple[bool, str]:
                             for sub in base_p.iterdir():
                                 if sub.is_dir():
                                     try:
-                                        children = sorted(p.name for p in sub.iterdir() if p.is_dir())
+                                        children = sorted(
+                                            p.name for p in sub.iterdir() if p.is_dir()
+                                        )
                                         print(f"      {sub.name}/: {children}")
                                         for child in sub.iterdir():
                                             if child.is_dir():
-                                                vc = child / "VC" / "Auxiliary" / "Build" / "vcvarsall.bat"
-                                                print(f"        {child.name}/VC/Auxiliary/Build/vcvarsall.bat exists={vc.exists()}")
+                                                vc = (
+                                                    child
+                                                    / "VC"
+                                                    / "Auxiliary"
+                                                    / "Build"
+                                                    / "vcvarsall.bat"
+                                                )
+                                                print(
+                                                    f"        {child.name}/VC/Auxiliary/Build/vcvarsall.bat exists={vc.exists()}"
+                                                )
                                     except Exception:
                                         pass
                         except Exception as e:

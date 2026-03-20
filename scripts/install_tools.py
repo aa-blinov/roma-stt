@@ -41,13 +41,26 @@ def main() -> int:
     ]
     for pkg, name in tools:
         print(f"Устанавливаю {name}...")
-        if not run(["winget", "install", "--id", pkg, "--accept-package-agreements", "--accept-source-agreements"]):
-            print(f"  Ошибка установки {name}. Можно поставить вручную, см. README или ИНСТРУКЦИЯ.md")
+        if not run(
+            [
+                "winget",
+                "install",
+                "--id",
+                pkg,
+                "--accept-package-agreements",
+                "--accept-source-agreements",
+            ]
+        ):
+            print(
+                f"  Ошибка установки {name}. Можно поставить вручную, см. README или ИНСТРУКЦИЯ.md"
+            )
         else:
             print(f"  {name} установлен.")
         print()
 
-    print("Теперь нужно поставить Visual Studio Build Tools (для сборки программы распознавания речи).")
+    print(
+        "Теперь нужно поставить Visual Studio Build Tools (для сборки программы распознавания речи)."
+    )
     print("Это большой пакет, установка может занять несколько минут.")
     yes = input("Установить сейчас? (y/N): ").strip().lower()
     if yes == "y" or yes == "д":
@@ -68,7 +81,9 @@ def main() -> int:
             ],
             timeout=600,
         ):
-            print("  Не удалось. Поставьте вручную: https://visualstudio.microsoft.com/visual-cpp-build-tools/")
+            print(
+                "  Не удалось. Поставьте вручную: https://visualstudio.microsoft.com/visual-cpp-build-tools/"
+            )
         else:
             print("  Готово. Возможно, потребуется перезапуск компьютера.")
     else:

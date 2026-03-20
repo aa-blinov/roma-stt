@@ -1,7 +1,7 @@
 """Use cases: запись/файл → транскрипция → постобработка → вставка. Application layer."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 from domain.interfaces import STTEngine
 from infrastructure.recorder import record_to_wav

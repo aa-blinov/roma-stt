@@ -18,18 +18,28 @@ def list_input_devices() -> list[dict]:
         if not isinstance(dev, dict):
             continue
         if dev.get("max_input_channels", 0) > 0:
-            result.append({
-                "index": dev["index"],
-                "name": dev.get("name", "?"),
-                "channels": dev["max_input_channels"],
-            })
+            result.append(
+                {
+                    "index": dev["index"],
+                    "name": dev.get("name", "?"),
+                    "channels": dev["max_input_channels"],
+                }
+            )
     return result
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Список устройств ввода (микрофонов) для выбора в config.")
-    parser.add_argument("--set", type=int, metavar="N", help="Записать в config.yaml устройство с номером N")
-    parser.add_argument("--default", action="store_true", help="Сбросить на системный микрофон по умолчанию (удалить input_device)")
+    parser = argparse.ArgumentParser(
+        description="Список устройств ввода (микрофонов) для выбора в config."
+    )
+    parser.add_argument(
+        "--set", type=int, metavar="N", help="Записать в config.yaml устройство с номером N"
+    )
+    parser.add_argument(
+        "--default",
+        action="store_true",
+        help="Сбросить на системный микрофон по умолчанию (удалить input_device)",
+    )
     args = parser.parse_args()
 
     try:
@@ -45,17 +55,24 @@ def main() -> int:
     print("Устройства ввода (микрофоны). Номер — для выбора в меню:")
     for d in devices:
         print(f"  {d['index']}. {d['name']} (каналов: {d['channels']})")
-    print("  (в config.yaml ключ input_device можно удалить или поставить null — тогда системный по умолчанию)")
+    print(
+        "  (в config.yaml ключ input_device можно удалить или поставить null — тогда системный по умолчанию)"
+    )
 
     if args.default:
         import yaml
-        config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8")) if CONFIG_PATH.exists() else {}
+
+        config = (
+            yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8")) if CONFIG_PATH.exists() else {}
+        )
         if config is None:
             config = {}
         config.pop("input_device", None)
         config.pop("input_device_name", None)
         CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-        CONFIG_PATH.write_text(yaml.dump(config, allow_unicode=True, default_flow_style=False), encoding="utf-8")
+        CONFIG_PATH.write_text(
+            yaml.dump(config, allow_unicode=True, default_flow_style=False), encoding="utf-8"
+        )
         print("Сброшено: используется системный микрофон по умолчанию.")
         return 0
 
@@ -66,16 +83,21 @@ def main() -> int:
             return 1
         if not CONFIG_PATH.exists():
             import yaml
+
             config = {}
         else:
             import yaml
+
             config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8")) or {}
         chosen = indices[args.set]
         config["input_device"] = args.set
         config["input_device_name"] = chosen["name"]
         CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
         import yaml
-        CONFIG_PATH.write_text(yaml.dump(config, allow_unicode=True, default_flow_style=False), encoding="utf-8")
+
+        CONFIG_PATH.write_text(
+            yaml.dump(config, allow_unicode=True, default_flow_style=False), encoding="utf-8"
+        )
         print(f"В config.yaml записано: input_device: {args.set} ({chosen['name']})")
     return 0
 

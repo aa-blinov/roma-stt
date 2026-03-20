@@ -17,7 +17,20 @@ def make_minimal_wav(path: Path, duration_sec: float = 0.5) -> None:
     # WAV header
     size = 36 + len(data)
     header = struct.pack(
-        "<4sI4s4sIHHIIHH4sI", b"RIFF", size, b"WAVE", b"fmt ", 16, 1, 1, rate, rate * 2, 2, 16, b"data", len(data)
+        "<4sI4s4sIHHIIHH4sI",
+        b"RIFF",
+        size,
+        b"WAVE",
+        b"fmt ",
+        16,
+        1,
+        1,
+        rate,
+        rate * 2,
+        2,
+        16,
+        b"data",
+        len(data),
     )
     path.write_bytes(header + data)
 

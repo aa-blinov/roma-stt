@@ -1,6 +1,37 @@
-extend-exclude = ["whisper.cpp"]
-line-length = 120
+# Ruff: линтинг и форматирование. Каталог tests/ не трогаем (см. exclude).
+# Совпадает с тем, что обычно ставит uv (3.12+). Минимум проекта по-прежнему >=3.11 в pyproject.toml.
+target-version = "py312"
+line-length = 100
+
+exclude = [
+    "tests",
+    ".venv",
+    "**/__pycache__",
+    "build",
+    "dist",
+]
 
 [lint]
-select = ["E", "F", "W", "I"]
-ignore = []
+select = [
+    "E",   # pycodestyle errors
+    "F",   # Pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "W",   # pycodestyle warnings
+]
+ignore = [
+    "E501", # длина строки — не рубим под 100 вручную везде
+]
+
+# sys.path должен быть до импорта infrastructure
+[lint.per-file-ignores]
+"scripts/print_menu_state.py" = ["E402"]
+
+[lint.isort]
+known-first-party = ["application", "domain", "infrastructure", "presentation"]
+
+[format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

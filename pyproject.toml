@@ -29,4 +29,5 @@ packages = ["application", "domain", "infrastructure", "presentation"]
 [tool.uv]
 dev-dependencies = [
     "pytest",
+    "ruff>=0.9",
 ]

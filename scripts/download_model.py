@@ -45,7 +45,8 @@ def download(name: str, dest_dir: Path | None = None) -> bool:
                     if total:
                         pct = 100 * downloaded / total
                         print(
-                            f"\r  {downloaded // (1024 * 1024)} MiB / {total // (1024 * 1024)} MiB ({pct:.0f}%)", end=""
+                            f"\r  {downloaded // (1024 * 1024)} MiB / {total // (1024 * 1024)} MiB ({pct:.0f}%)",
+                            end="",
                         )
         print(f"\nSaved: {path}")
         return True
@@ -57,21 +58,26 @@ def download(name: str, dest_dir: Path | None = None) -> bool:
 
 
 def main() -> int:
+    n = len(ORDERED_MODELS)
     parser = argparse.ArgumentParser(
-        description="Download multilingual ggml model. Name or number 1-%d (see list-available)." % len(ORDERED_MODELS)
+        description=f"Download multilingual ggml model. Name or number 1-{n} (see list-available)."
     )
-    parser.add_argument("name", help="Model name or number (1-%d)" % len(ORDERED_MODELS))
+    parser.add_argument("name", help=f"Model name or number (1-{n})")
     parser.add_argument("--dir", type=Path, default=MODELS_DIR, help="Destination directory")
     args = parser.parse_args()
     name = args.name.strip()
     if name.isdigit():
         idx = int(name)
         if idx < 1 or idx > len(ORDERED_MODELS):
-            print(f"Номер должен быть от 1 до {len(ORDERED_MODELS)}. Доступные: a/d в меню моделей.")
+            print(
+                f"Номер должен быть от 1 до {len(ORDERED_MODELS)}. Доступные: a/d в меню моделей."
+            )
             return 1
         name = ORDERED_MODELS[idx - 1]
     if name not in MODELS:
-        print(f"Неизвестная модель: {name}. Доступные: {', '.join(ORDERED_MODELS)} или номер 1-{len(ORDERED_MODELS)}.")
+        print(
+            f"Неизвестная модель: {name}. Доступные: {', '.join(ORDERED_MODELS)} или номер 1-{len(ORDERED_MODELS)}."
+        )
         return 1
     return 0 if download(name, args.dir) else 1
 

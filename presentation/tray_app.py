@@ -2,8 +2,8 @@
 
 import io
 import sys
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Optional, Union
 
 import pystray
 from PIL import Image
@@ -61,8 +61,8 @@ def _load_icon_image(icon_path: Path, size: int = 64) -> Image.Image:
 
 
 def create_tray_icon(
-    icon_path: Optional[Union[str, Path]] = None,
-    on_before_exit: Optional[Callable[[], None]] = None,
+    icon_path: str | Path | None = None,
+    on_before_exit: Callable[[], None] | None = None,
     hotkey_hint: str = "Ctrl+F9",
 ) -> pystray.Icon:
     """Create system tray icon with menu. on_before_exit called before exit (e.g. remove PID file)."""
