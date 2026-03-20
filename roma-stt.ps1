@@ -1,4 +1,5 @@
 ﻿#Requires -Version 5.1
+# Encoding: UTF-8 with BOM — required on Windows PowerShell 5.1 for Cyrillic in this script.
 <#
 .SYNOPSIS
 Roma-STT - меню управления
@@ -476,7 +477,7 @@ function Do-Models {
         Pause-Continue; return
     }
     & uv run python scripts/models.py list-all
-    $num = Read-Host "Номер (1-8) или название (Enter  -  в главное меню)"
+    $num = Read-Host "Номер из списка или название (Enter  -  в главное меню)"
     if (-not $num) { return }
     & uv run python scripts/models.py use $num
     Pause-Continue

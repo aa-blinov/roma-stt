@@ -1,0 +1,6 @@
+root = true
+
+# Windows PowerShell 5.1 reads scripts without BOM as system ANSI — Cyrillic breaks.
+[roma-stt.ps1]
+charset = utf-8-bom
+end_of_line = crlf

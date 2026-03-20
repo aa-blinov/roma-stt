@@ -9,19 +9,11 @@ ROOT = Path(__file__).resolve().parent.parent
 MODELS_DIR = ROOT / "models"
 CONFIG_PATH = ROOT / "config.yaml"
 
-# Manifest of available multilingual/turbo models (name -> description).
-# Order = numbers in list and download/set-by-number.
-MODELS_MANIFEST = {
-    "tiny": "мультиязычная, ~75 MiB",
-    "base": "мультиязычная, ~142 MiB",
-    "small": "мультиязычная",
-    "medium": "мультиязычная",
-    "large-v3": "мультиязычная, рекомендуется",
-    "large-v3-turbo": "мультиязычная, turbo",
-    "base-q5_1": "мультиязычная, квантизация",
-    "small-q5_1": "мультиязычная, квантизация",
-}
-ORDERED_NAMES = list(MODELS_MANIFEST.keys())
+# Манифест и порядок номеров — единый источник whisper_models.py
+from whisper_models import MODEL_DESCRIPTIONS, ORDERED_MODEL_KEYS
+
+MODELS_MANIFEST = {k: MODEL_DESCRIPTIONS[k] for k in ORDERED_MODEL_KEYS}
+ORDERED_NAMES = list(ORDERED_MODEL_KEYS)
 
 # ANSI (Windows 10+ cmd/PowerShell поддерживают)
 _GREEN = "\033[32m"  # скачана
@@ -146,7 +138,10 @@ def main() -> int:
     p_set_num = sub.add_parser("set-by-number")
     p_set_num.add_argument("num", help="Number from list-all (1-based), model must be downloaded")
     p_use = sub.add_parser("use")
-    p_use.add_argument("num", help="Number 1-8: set active if downloaded, else download then set")
+    p_use.add_argument(
+        "num",
+        help=f"Number 1–{len(ORDERED_NAMES)}: set active if downloaded, else download then set",
+    )
     args = parser.parse_args()
     if args.cmd == "list-all":
         list_all()

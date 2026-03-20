@@ -5,23 +5,14 @@ import sys
 import urllib.request
 from pathlib import Path
 
+from whisper_models import ORDERED_MODEL_KEYS, model_download_url
+
 ROOT = Path(__file__).resolve().parent.parent
 MODELS_DIR = ROOT / "models"
 
-# Multilingual models only (no .en). Hugging Face ggerganov/whisper.cpp
-HF_BASE = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main"
-MODELS = {
-    "tiny": f"{HF_BASE}/ggml-tiny.bin",
-    "base": f"{HF_BASE}/ggml-base.bin",
-    "small": f"{HF_BASE}/ggml-small.bin",
-    "medium": f"{HF_BASE}/ggml-medium.bin",
-    "large-v3": f"{HF_BASE}/ggml-large-v3.bin",
-    "large-v3-turbo": f"{HF_BASE}/ggml-large-v3-turbo.bin",
-    "base-q5_1": f"{HF_BASE}/ggml-base-q5_1.bin",
-    "small-q5_1": f"{HF_BASE}/ggml-small-q5_1.bin",
-}
-# Порядок для выбора по номеру (должен совпадать с models.py list-available)
-ORDERED_MODELS = list(MODELS.keys())
+MODELS = {key: model_download_url(key) for key in ORDERED_MODEL_KEYS}
+# Порядок для выбора по номеру (совпадает с scripts/models.py)
+ORDERED_MODELS = list(ORDERED_MODEL_KEYS)
 
 
 def download(name: str, dest_dir: Path | None = None) -> bool:
