@@ -190,7 +190,7 @@ def main() -> None:
     # Не запускать второй экземпляр — иначе горячие клавиши конфликтуют
     if win32gui.FindWindow("RomaSTT", None):
         logger.warning("second instance rejected (window already exists)")
-        print("Roma-STT уже запущена в трее. Остановите её пунктом 4, затем запустите снова.")
+        print("Roma-STT уже запущена в трее. Остановите её пунктом 3 меню, затем запустите снова.")
         return
 
     # Две клавиши: запись и стоп (по умолчанию Ctrl+F2 и Ctrl+F3)
@@ -222,6 +222,7 @@ def main() -> None:
     record_thread: threading.Thread | None = None
     wav_path: str | None = None
     fallback_used: list = [False]  # recorder sets True if device was invalid and fell back to default
+    vad_missing_logged: list = [False]  # one warning if whisper_vad on but model file absent
     pid_file = get_config_path().parent / ".roma-stt.pid"
 
     def remove_pid_file():
@@ -298,7 +299,7 @@ def main() -> None:
             except Exception as e:
                 logger.exception("save_config after device fallback: %s", e)
             logger.warning("input device was invalid, used default; cleared input_device in config")
-            _notify("Микрофон из конфига недоступен. Использован системный по умолчанию. Выберите устройство в пункте 10.")
+            _notify("Выбранный микрофон недоступен — использован системный по умолчанию")
         if wav_path:
             try:
                 lang = config.get("language", "ru")
@@ -306,7 +307,26 @@ def main() -> None:
                 beam_size = int(config.get("whisper_beam_size", 5))
                 best_of = int(config.get("whisper_best_of", 5))
                 prompt = config.get("whisper_prompt", "") or ""
-                logger.info("transcribe start | lang=%s module=%s gpu_layers=%s wav=%s", lang, module, gpu_layers, wav_path)
+                use_vad = bool(config.get("whisper_vad", True))
+                root = get_config_path().parent.resolve()
+                vad_rel = (config.get("whisper_vad_model_path") or "").strip()
+                vad_abs = str((root / vad_rel).resolve()) if vad_rel else ""
+                vad_ok = bool(vad_abs and Path(vad_abs).is_file())
+                if use_vad and vad_rel and not vad_ok and not vad_missing_logged[0]:
+                    logger.warning(
+                        "whisper_vad on, but VAD model missing: %s — run: roma-stt.bat download-vad",
+                        root / vad_rel,
+                    )
+                    vad_missing_logged[0] = True
+                logger.info(
+                    "transcribe start | lang=%s module=%s gpu_layers=%s vad=%s vad_model_ok=%s wav=%s",
+                    lang,
+                    module,
+                    gpu_layers,
+                    use_vad,
+                    vad_ok,
+                    wav_path,
+                )
                 text = engine.transcribe(
                     wav_path,
                     language=lang,
@@ -314,22 +334,23 @@ def main() -> None:
                     beam_size=beam_size,
                     best_of=best_of,
                     prompt=prompt,
+                    use_vad=use_vad,
+                    vad_model_path=vad_abs if vad_rel else None,
                 )
-                if config.get("postprocess", True):
-                    text = postprocess(text)
+                text = postprocess(text)
                 length = len(text) if text else 0
                 preview = (text[:80] + "…") if text and len(text) > 80 else (text or "")
                 logger.info("transcribe done | length=%d preview=%r", length, preview)
                 if not (text and text.strip()):
                     logger.warning("transcribe empty result")
-                    _notify("Ничего не распознано. Говорите чётко, подольше; проверьте микрофон.")
+                    _notify("Ничего не распознано — говорите чётко, подольше; проверьте микрофон")
                 else:
                     paste_text(text)
                     logger.info("paste done | length=%d", length)
-                    _notify("Текст вставлен.")
+                    _notify("Текст вставлен")
             except (FileNotFoundError, subprocess.CalledProcessError) as e:
                 logger.exception("transcribe failed: %s", e)
-                _notify("Ошибка распознавания (нет exe или сбой). Пункт 2 — проверка, пункт 1 — установка.")
+                _notify("Ошибка распознавания — переустановите службу (пункт 1)")
             except Exception as e:
                 logger.exception("unexpected error: %s", e)
                 _notify(f"Ошибка: {e}")

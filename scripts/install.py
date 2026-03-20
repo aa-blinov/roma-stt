@@ -24,8 +24,7 @@ DEFAULT_CONFIG = {
     "input_device_name": None,
     "language": "ru",
     "module": "cpu",
-    "notifications": True,
-    "postprocess": True,
+    "notifications": False,  # всплывающие уведомления; только через config.yaml: notifications: true
     "whisper_beam_size": 5,
     "whisper_best_of": 5,
     "whisper_cpp_path_amd": "",
@@ -33,6 +32,8 @@ DEFAULT_CONFIG = {
     "whisper_cpp_path_cuda": "bin/main-cuda.exe",
     "whisper_model_path": "",
     "whisper_prompt": "",
+    "whisper_vad": True,
+    "whisper_vad_model_path": "models/ggml-silero-v6.2.0.bin",
 }
 
 
@@ -100,7 +101,7 @@ def main() -> int:
     os.chdir(ROOT)
     parser = argparse.ArgumentParser()
     parser.add_argument("--arch", choices=["cpu", "cuda", "amd"], default="cpu", help="Target architecture")
-    parser.add_argument("--no-download", action="store_true", help="Skip downloading default model")
+    parser.add_argument("--no-download", action="store_true", help="Skip downloading default model and VAD model")
     parser.add_argument("--no-whisper-build", action="store_true", help="Skip automatic whisper.cpp clone and build")
     parser.add_argument("--no-build-check", action="store_true", help="Skip whisper.cpp build check")
     args = parser.parse_args()
@@ -130,6 +131,12 @@ def main() -> int:
                 print("Загрузка модели не удалась. Позже: пункт 5 -> модели.")
         else:
             print("Сборка не удалась — модель не качаем. После успешной сборки: пункт 5 -> модели.")
+        r_vad = subprocess.run(
+            [sys.executable, str(ROOT / "scripts" / "download_vad_model.py")],
+            cwd=str(ROOT),
+        )
+        if r_vad.returncode != 0:
+            print("Модель VAD не скачалась. Позже: roma-stt.bat download-vad")
     if not args.no_build_check:
         check_build()
     return 0

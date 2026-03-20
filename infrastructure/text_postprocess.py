@@ -2,6 +2,10 @@
 
 Removes common Whisper hallucinations and artefacts, then normalises
 capitalisation and trailing punctuation.
+
+Russian phrase list is largely aligned with community-reported outputs on noise/silence
+(Whisper large-v2, ~13 h): https://gist.github.com/waveletdeboshir/8bf52f04bf78018194f25b2390c08309
+Plus typical subtitle / «продолжение» templates seen on GitHub discussions around Whisper.
 """
 
 import re
@@ -19,6 +23,82 @@ _HALLUCINATION_PATTERNS: list[re.Pattern] = [
     re.compile(r"(.)\1{4,}"),
     re.compile(r"(\S{1,3}-){3,}\S{1,3}"),
 ]
+
+# Russian templates (substring removal; case-insensitive).
+_RU_HALLUCINATION_PATTERNS: list[re.Pattern] = [
+    re.compile(r"продолжение\s+следует\.?\.?\.?", re.IGNORECASE),
+    re.compile(r"смотрите\s+продолжение\b.*", re.IGNORECASE),
+    re.compile(r"спасибо\s+за\s+субтитры!?\.?", re.IGNORECASE),
+    re.compile(r"субтитры\s+добавил\b.*", re.IGNORECASE),
+    re.compile(r"субтитры\s+подогнал\b.*", re.IGNORECASE),
+    re.compile(r"редактор\s+субтитров\b.*", re.IGNORECASE),
+    re.compile(r"корректор\s+[а-яё]\.[а-яё]+[а-яё]*\b.*", re.IGNORECASE),
+    re.compile(r"\bдима\s*торзок\b.*", re.IGNORECASE),
+    re.compile(r"\bdimatorzok\b.*", re.IGNORECASE),
+    re.compile(r"подпишись(?:\s+на\s+канал)?!?\.?", re.IGNORECASE),
+    re.compile(r"по\s+громкоговорител[юя]\b.*", re.IGNORECASE),
+    re.compile(r"по\s+тв\.?\b.*", re.IGNORECASE),
+]
+
+# If the whole transcript equals one of these (after strip + casefold), drop it.
+# Synced with gist above + common SFX captions in Russian.
+_RU_EXACT_HALLUCINATION_PHRASES_LOWER: frozenset[str] = frozenset(
+    line.strip().lower()
+    for line in """
+веселая музыка
+спокойная музыка
+грустная мелодия
+лирическая музыка
+динамичная музыка
+таинственная музыка
+торжественная музыка
+интригующая музыка
+напряженная музыка
+печальная музыка
+тревожная музыка
+музыкальная заставка
+перестрелка
+гудок поезда
+рёв мотора
+шум двигателя
+сигнал автомобиля
+лай собак
+пес лает
+кашель
+выстрелы
+шум дождя
+песня
+по громкоговорителю
+по громкоговорческом языке
+взрыв
+шум мотора
+плеск воды
+гудок автомобиля
+лай собаки
+по тв.
+аплодисменты
+городской шум
+полиция
+городской гудок
+сигнал машины
+смех
+стук в дверь
+полицейская сирена
+звонок в дверь
+подпишись на канал
+подпишись!
+подпишись
+поехали!
+поехали.
+девушки отдыхают...
+🦜
+💥
+😎
+🤨
+🤔
+""".strip().splitlines()
+    if line.strip()
+)
 
 # Tokens that Whisper emits when it detects no speech or non-speech audio.
 _SILENCE_TOKENS: frozenset[str] = frozenset({
@@ -59,12 +139,18 @@ def postprocess(text: str) -> str:
     if cleaned.lower() in _SILENCE_TOKENS:
         return ""
 
+    # Whole line is a known Russian noise caption (gist / common hallucinations)
+    if cleaned.casefold() in _RU_EXACT_HALLUCINATION_PHRASES_LOWER:
+        return ""
+
     # Remove silence tokens embedded in longer text
     for token in _SILENCE_TOKENS:
         cleaned = re.sub(re.escape(token), "", cleaned, flags=re.IGNORECASE)
 
-    # 2. Remove hallucination patterns
+    # 2. Remove hallucination patterns (generic + Russian)
     for pattern in _HALLUCINATION_PATTERNS:
+        cleaned = pattern.sub("", cleaned)
+    for pattern in _RU_HALLUCINATION_PATTERNS:
         cleaned = pattern.sub("", cleaned)
 
     # Collapse multiple spaces / stray punctuation left after removal

@@ -62,6 +62,15 @@ def test_load_config_removes_deprecated_hotkey_key():
         assert "hotkey" not in cfg
 
 
+def test_load_config_strips_legacy_postprocess_key():
+    """postprocess toggle removed — key ignored so YAML does not drive behavior."""
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "config.yaml"
+        path.write_text("module: cpu\npostprocess: false\n")
+        cfg = load_config(path)
+        assert "postprocess" not in cfg
+
+
 def test_load_config_notifications_default_false():
     """notifications must default to False even when not in YAML."""
     with tempfile.TemporaryDirectory() as tmp:

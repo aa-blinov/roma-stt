@@ -33,9 +33,12 @@ class WhisperCppEngine:
         beam_size: int = 5,
         best_of: int = 5,
         prompt: str = "",
+        use_vad: bool = True,
+        vad_model_path: str | None = None,
     ) -> str:
         """Run whisper.cpp: -m model -f audio.wav -nt -l lang [options], return stdout as text.
-        If the binary does not support -ngl (e.g. CPU-only build), retries without -ngl."""
+        If the binary does not support -ngl (e.g. CPU-only build), retries without -ngl.
+        whisper.cpp requires -vm/--vad-model when using --vad; without a real file, VAD is skipped."""
         audio = Path(audio_path).resolve()
         base_args = [
             str(self.exe_path.resolve()),
@@ -51,6 +54,13 @@ class WhisperCppEngine:
             "-bo",
             str(best_of),
         ]
+        vad_file: Path | None = None
+        if vad_model_path:
+            p = Path(vad_model_path)
+            if p.is_file():
+                vad_file = p.resolve()
+        if use_vad and vad_file is not None:
+            base_args.extend(["--vad", "-vm", str(vad_file)])
         if prompt:
             base_args += ["--prompt", prompt]
         args_with_gpu = base_args + ["-ngl", str(n_gpu_layers)] if n_gpu_layers > 0 else base_args

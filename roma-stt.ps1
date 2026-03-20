@@ -1,7 +1,7 @@
 ﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
-Roma-STT — меню управления
+Roma-STT - меню управления
 #>
 
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -38,7 +38,7 @@ function Set-Config {
 }
 
 function Refresh-Env {
-    # Обновляем PATH и ключевые переменные из реестра — после winget install
+    # Обновляем PATH и ключевые переменные из реестра  -  после winget install
     $m = [System.Environment]::GetEnvironmentVariable("PATH", "Machine")
     $u = [System.Environment]::GetEnvironmentVariable("PATH", "User")
     if ($m -or $u) { $env:PATH = "$m;$u" }
@@ -74,26 +74,54 @@ function Get-RunningPid {
             $proc = Get-Process -Id ([int]$pidVal) -ErrorAction SilentlyContinue
             if ($proc) { return [int]$pidVal }
         }
-        # pid-файл есть, но процесс мёртв — удаляем зависший файл
+        # pid-файл есть, но процесс мёртв  -  удаляем зависший файл
         Remove-Item ".roma-stt.pid" -ErrorAction SilentlyContinue
     }
     return $null
 }
 
+function Get-ReadinessSummary {
+    # Компактная строка для шапки меню (scripts/check_ready.py --summary)
+    if (-not (Test-Path ".venv")) {
+        return @{ Ok = $false; Detail = 'нет .venv, пункт 1' }
+    }
+    try {
+        $out = (& uv run python scripts/check_ready.py --summary 2>$null | Select-Object -First 1)
+        if (-not $out) { return @{ Ok = $false; Detail = "не удалось проверить" } }
+        $parts = $out.Trim() -split "`t", 2
+        $ok = ($parts[0] -eq "1")
+        $detail = if ($parts.Count -gt 1 -and $parts[1]) { $parts[1].Trim() } else { "" }
+        if ($detail.Length -gt 72) { $detail = $detail.Substring(0, 69) + "..." }
+        return @{ Ok = $ok; Detail = $detail }
+    } catch {
+        return @{ Ok = $false; Detail = "ошибка проверки" }
+    }
+}
+
 function Get-MenuConfig {
-    # Одним вызовом Python читаем все нужные для меню значения
-    if (-not (Test-Path ".venv")) { return @{ lang = ""; notif = ""; post = ""; model = ""; hkr = ""; hks = ""; module = "" } }
-    $raw = & uv run python -c "from infrastructure.config_repo import load_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); mp=cfg.get('whisper_model_path',''); model=Path(mp).stem if mp else ''; print(cfg.get('language','ru'), cfg.get('notifications', False), cfg.get('postprocess', True), model, cfg.get('hotkey_record','Ctrl+F2'), cfg.get('hotkey_stop','Ctrl+F3'), cfg.get('module','cpu'), sep='|')" 2>$null
-    if (-not $raw) { return @{ lang = "ru"; notif = "False"; post = "True"; model = ""; hkr = "Ctrl+F2"; hks = "Ctrl+F3"; module = "cpu" } }
-    $parts = $raw.Trim().Split('|')
-    return @{ lang = $parts[0]; notif = $parts[1]; post = $parts[2]; model = $parts[3]; hkr = $parts[4]; hks = $parts[5]; module = if ($parts.Count -gt 6) { $parts[6] } else { "cpu" } }
+    # JSON одной строкой из scripts/print_menu_state.py (не ломается от предупреждений uv в stdout)
+    if (-not (Test-Path ".venv")) { return @{ lang = ""; model = ""; hkr = ""; hks = ""; module = "" } }
+    $raw = (& uv run python scripts/print_menu_state.py 2>$null | Select-Object -Last 1)
+    if (-not $raw) {
+        return @{ lang = "ru"; model = ""; hkr = "Ctrl+F2"; hks = "Ctrl+F3"; module = "cpu" }
+    }
+    try {
+        $o = $raw.Trim() | ConvertFrom-Json
+        return @{
+            lang   = [string]$o.lang
+            model  = [string]$o.model_stem
+            hkr    = [string]$o.hotkey_record
+            hks    = [string]$o.hotkey_stop
+            module = [string]$o.module
+        }
+    } catch {
+        return @{ lang = "ru"; model = ""; hkr = "Ctrl+F2"; hks = "Ctrl+F3"; module = "cpu" }
+    }
 }
 
 function Show-Menu {
     $cfg = Get-MenuConfig
     $langVal   = if ($cfg.lang)  { $cfg.lang }  else { "?" }
-    $notifVal  = if ($cfg.notif -eq "True") { "вкл" } else { "выкл" }
-    $postVal   = if ($cfg.post  -eq "False") { "выкл" } else { "вкл" }
     $modelVal  = if ($cfg.model) { $cfg.model -replace '^ggml-','' } else { "?" }
     $hkrVal    = if ($cfg.hkr)  { $cfg.hkr }  else { "?" }
     $hksVal    = if ($cfg.hks)  { $cfg.hks }  else { "?" }
@@ -102,6 +130,8 @@ function Show-Menu {
     $runningPid = Get-RunningPid
     $statusText  = if ($runningPid) { "работает  (PID $runningPid)" } else { "остановлена" }
     $statusColor = if ($runningPid) { "Green" } else { "DarkGray" }
+
+    $ready = Get-ReadinessSummary
 
     Clear-Host
     Write-Host ""
@@ -112,40 +142,37 @@ function Show-Menu {
     Write-Host "  Служба: " -NoNewline; Write-Host $statusText -NoNewline -ForegroundColor $statusColor
     Write-Host "  |  Режим: " -NoNewline; Write-Host $modVal -NoNewline -ForegroundColor Cyan
     Write-Host "  |  Модель: " -NoNewline; Write-Host $modelVal -ForegroundColor Cyan
+    Write-Host "  Готовность: " -NoNewline
+    if ($ready.Ok) {
+        Write-Host "OK" -ForegroundColor Green
+    } else {
+        Write-Host "не готово" -NoNewline -ForegroundColor Yellow
+        if ($ready.Detail) { Write-Host ('  - ' + $ready.Detail) -ForegroundColor DarkYellow }
+        else { Write-Host "" }
+    }
     Write-Host " ============================================================" -ForegroundColor DarkGray
-    Write-Host ""
     Write-Host "  Введите цифру и нажмите Enter."
-    Write-Host "  Первый запуск: 1 -> 2 -> 3" -ForegroundColor Yellow
-    Write-Host ""
-    Write-Host "  " -NoNewline; Write-Host " 1." -NoNewline -ForegroundColor Yellow; Write-Host " Установка"
-    Write-Host "     Один раз: uv, Git, CMake, VS Build Tools, среда, модель, whisper.cpp." -ForegroundColor DarkGray
-    Write-Host "  " -NoNewline; Write-Host " 2." -NoNewline -ForegroundColor Yellow; Write-Host " Проверка готовности"
-    Write-Host "     Убедиться, что всё установлено. После пункта 1." -ForegroundColor DarkGray
-    Write-Host "  " -NoNewline; Write-Host " 3." -NoNewline -ForegroundColor Yellow; Write-Host " Запустить службу (в трее)"
+    Write-Host "  Первый запуск: 1, затем 2. Пункт 1  -  также обновление и удаление установки." -ForegroundColor Yellow
+    Write-Host "  " -NoNewline; Write-Host " 1." -NoNewline -ForegroundColor Yellow; Write-Host " Установка / переустановка / удаление"
+    Write-Host "     Первый раз  -  полная установка. Уже есть .venv  -  обновить или удалить." -ForegroundColor DarkGray
+    Write-Host "  " -NoNewline; Write-Host " 2." -NoNewline -ForegroundColor Yellow; Write-Host " Запустить службу (в трее)"
     Write-Host "     Режим и горячая клавиша из config.yaml." -ForegroundColor DarkGray
-    Write-Host "  " -NoNewline; Write-Host " 4." -NoNewline -ForegroundColor Yellow; Write-Host " Остановить службу"
+    Write-Host "  " -NoNewline; Write-Host " 3." -NoNewline -ForegroundColor Yellow; Write-Host " Остановить службу"
     Write-Host "     Завершить работу Roma-STT в трее." -ForegroundColor DarkGray
-    Write-Host ""
-    Write-Host " --- Настройки (применяются после перезапуска: 4 -> 3) ------" -ForegroundColor DarkGray
-    Write-Host "  " -NoNewline; Write-Host " 5." -NoNewline -ForegroundColor Yellow; Write-Host " Модели распознавания       " -NoNewline; Write-Host "[$modelVal]" -ForegroundColor Cyan
-    Write-Host "     Список моделей — выбрать или скачать и выбрать." -ForegroundColor DarkGray
-    Write-Host "  " -NoNewline; Write-Host " 6." -NoNewline -ForegroundColor Yellow; Write-Host " Подбор свободной горячей клавиши"
+    Write-Host " --- Настройки (после изменений: 3 -> 2) ---------------------" -ForegroundColor DarkGray
+    Write-Host "  " -NoNewline; Write-Host " 4." -NoNewline -ForegroundColor Yellow; Write-Host " Модели распознавания       " -NoNewline; Write-Host "[$modelVal]" -ForegroundColor Cyan
+    Write-Host "     Список моделей  -  выбрать или скачать и выбрать." -ForegroundColor DarkGray
+    Write-Host "  " -NoNewline; Write-Host " 5." -NoNewline -ForegroundColor Yellow; Write-Host " Подбор свободной горячей клавиши"
     Write-Host "     Протестировать F-клавиши и записать в config.yaml." -ForegroundColor DarkGray
-    Write-Host "  " -NoNewline; Write-Host " 7." -NoNewline -ForegroundColor Yellow; Write-Host " Горячая клавиша записи     " -NoNewline; Write-Host "[$hkrVal]" -ForegroundColor Cyan
+    Write-Host "  " -NoNewline; Write-Host " 6." -NoNewline -ForegroundColor Yellow; Write-Host " Горячая клавиша записи     " -NoNewline; Write-Host "[$hkrVal]" -ForegroundColor Cyan
     Write-Host "     Клавиша для начала записи голоса." -ForegroundColor DarkGray
-    Write-Host "  " -NoNewline; Write-Host " 8." -NoNewline -ForegroundColor Yellow; Write-Host " Горячая клавиша стопа      " -NoNewline; Write-Host "[$hksVal]" -ForegroundColor Cyan
+    Write-Host "  " -NoNewline; Write-Host " 7." -NoNewline -ForegroundColor Yellow; Write-Host " Горячая клавиша стопа      " -NoNewline; Write-Host "[$hksVal]" -ForegroundColor Cyan
     Write-Host "     Клавиша для остановки записи." -ForegroundColor DarkGray
-    Write-Host "  " -NoNewline; Write-Host " 9." -NoNewline -ForegroundColor Yellow; Write-Host " Язык распознавания         " -NoNewline; Write-Host "[$langVal]" -ForegroundColor Cyan
+    Write-Host "  " -NoNewline; Write-Host " 8." -NoNewline -ForegroundColor Yellow; Write-Host " Язык распознавания         " -NoNewline; Write-Host "[$langVal]" -ForegroundColor Cyan
     Write-Host "     Код языка ISO 639-1: ru, en, de, fr, es, it, zh..." -ForegroundColor DarkGray
-    Write-Host "  " -NoNewline; Write-Host "10." -NoNewline -ForegroundColor Yellow; Write-Host " Устройство ввода (микрофон)"
+    Write-Host "  " -NoNewline; Write-Host " 9." -NoNewline -ForegroundColor Yellow; Write-Host " Устройство ввода (микрофон)"
     Write-Host "     Выбрать микрофон из списка устройств." -ForegroundColor DarkGray
-    Write-Host "  " -NoNewline; Write-Host "11." -NoNewline -ForegroundColor Yellow; Write-Host " Удалить установку"
-    Write-Host "     Удалить .venv и models — для переустановки с нуля." -ForegroundColor DarkGray
-    Write-Host "  " -NoNewline; Write-Host "12." -NoNewline -ForegroundColor Yellow; Write-Host " Уведомления Windows        " -NoNewline; Write-Host "[$notifVal]" -ForegroundColor Cyan
-    Write-Host "     Всплывающие уведомления при вставке текста." -ForegroundColor DarkGray
-    Write-Host "  " -NoNewline; Write-Host "13." -NoNewline -ForegroundColor Yellow; Write-Host " Постобработка текста       " -NoNewline; Write-Host "[$postVal]"  -ForegroundColor Cyan
-    Write-Host "     Заглавная буква, точка в конце, удаление артефактов Whisper." -ForegroundColor DarkGray
-    Write-Host "  " -NoNewline; Write-Host "14." -NoNewline -ForegroundColor Yellow; Write-Host " Выход"
+    Write-Host "  " -NoNewline; Write-Host "10." -NoNewline -ForegroundColor Yellow; Write-Host " Выход"
     Write-Host ""
 }
 
@@ -228,7 +255,7 @@ Repair-WinGetPackageManager -AllUsers 2>$null
                 Write-Host "Может потребоваться перезагрузка." -ForegroundColor Yellow
             }
         } else {
-            Write-Host "Пропущено — сборка whisper.cpp может не сработать." -ForegroundColor DarkGray
+            Write-Host "Пропущено  -  сборка whisper.cpp может не сработать." -ForegroundColor DarkGray
         }
     }
 
@@ -258,7 +285,7 @@ Repair-WinGetPackageManager -AllUsers 2>$null
         } else {
             Write-Host ""
             Write-Host "Vulkan SDK (LunarG) нужен для режима amd (~200 МБ)." -ForegroundColor Yellow
-            Write-Host "  (vulkaninfo из GPU-драйвера не считается — нужны заголовки и glslc)" -ForegroundColor DarkGray
+            Write-Host "  (vulkaninfo из GPU-драйвера не считается  -  нужны заголовки и glslc)" -ForegroundColor DarkGray
             $vulkan = Read-Host "Установить сейчас? (y/N)"
             if ($vulkan -match '^[yYдД]$') {
                 & winget install --id KhronosGroup.VulkanSDK --accept-package-agreements --accept-source-agreements
@@ -271,10 +298,8 @@ Repair-WinGetPackageManager -AllUsers 2>$null
     return $true
 }
 
-function Do-Install {
-    Write-Host "[1] Установка..." -ForegroundColor Cyan
-
-    # Выбор архитектуры (до установки инструментов — не нужен uv)
+function Invoke-RomaInstall {
+    # Полная цепочка: архитектура, winget-инструменты, scripts/install.py (без проверок «уже есть .venv»)
     $gpu = Detect-Gpu
     $a = "cpu"
     if ($gpu.NvidiaName -or $gpu.AmdName) {
@@ -284,7 +309,7 @@ function Do-Install {
         $hint = "1"
         if ($gpu.NvidiaName) { $hint += "/2" }
         if ($gpu.AmdName)    { $hint += "/3" }
-        $arch = Read-Host "Архитектура ($hint, Enter — в главное меню)"
+        $arch = Read-Host "Архитектура ($hint, Enter  -  назад)"
         if (-not $arch) { return }
         if ($arch -eq "2") {
             if (-not $gpu.NvidiaName) { Write-Host "Выбран CUDA, но NVIDIA не обнаружена." -ForegroundColor Red; Pause-Continue; return }
@@ -294,48 +319,71 @@ function Do-Install {
             $a = "amd"
         }
     } else {
-        Write-Host "  Дискретная видеокарта не обнаружена — будет CPU-режим." -ForegroundColor DarkGray
+        Write-Host "  Дискретная видеокарта не обнаружена  -  будет CPU-режим." -ForegroundColor DarkGray
     }
 
-    # Установка системных инструментов через winget
     Write-Host ""
     Write-Host "Шаг 1/2: Проверка и установка системных инструментов..." -ForegroundColor Cyan
     $ok = Install-Tools $a
     if (-not $ok) { Pause-Continue; return }
 
-    # Обновляем PATH из реестра (winget мог добавить новые пути)
     Refresh-Env
 
-    # Проверяем uv после установки (PATH может не обновиться без перезапуска)
     if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
         Write-Host ""
         Write-Host "uv только что установлен, но PATH ещё не обновился." -ForegroundColor Yellow
-        Write-Host "Закройте это окно, откройте снова и снова выберите 1." -ForegroundColor Yellow
+        Write-Host "Закройте это окно, откройте снова и пункт 1  -  переустановить (п.1 в подменю)." -ForegroundColor Yellow
         Pause-Continue; return
     }
 
-    # Установка Python-окружения, whisper.cpp, модели
     Write-Host ""
     Write-Host "Шаг 2/2: Установка окружения, сборка whisper [$a], загрузка модели..." -ForegroundColor Cyan
     & uv run python scripts/install.py --arch $a
     Pause-Continue
 }
 
-function Do-Check {
-    Write-Host "[2] Проверка готовности..." -ForegroundColor Cyan
-    & uv run python scripts/check_ready.py
-    Pause-Continue
+function Do-Install {
+    Write-Host "[1] Установка..." -ForegroundColor Cyan
+    if (-not (Test-Path ".venv")) {
+        Invoke-RomaInstall
+        return
+    }
+
+    Write-Host "Установка уже есть (.venv)." -ForegroundColor Yellow
+    Write-Host "  1  -  переустановить / обновить (winget, uv sync, сборка whisper)"
+    Write-Host "  2  -  удалить установку (.venv и папка models)"
+    $sub = Read-Host "Выбор (1-2, Enter  -  в главное меню)"
+    if (-not $sub) { return }
+
+    if ($sub -eq "2") {
+        Write-Host "Будут удалены папки .venv и models (если есть)."
+        $confirm = Read-Host "Удалить? (y/N, Enter  -  отмена)"
+        if (-not $confirm -or $confirm -notmatch "^[yYдД]$") { return }
+        if (Test-Path ".venv")  { Remove-Item ".venv"  -Recurse -Force }
+        if (Test-Path "models") { Remove-Item "models" -Recurse -Force }
+        Write-Host "Удалено. Чтобы поставить снова, снова выберите пункт 1." -ForegroundColor Green
+        Pause-Continue
+        return
+    }
+
+    if ($sub -eq "1") {
+        Invoke-RomaInstall
+        return
+    }
+
+    Write-Host "Неизвестный выбор." -ForegroundColor Red
+    Start-Sleep -Seconds 1
 }
 
 function Do-Start {
-    Write-Host "[3] Запуск службы..." -ForegroundColor Cyan
+    Write-Host "[2] Запуск службы..." -ForegroundColor Cyan
     if (-not (Test-Path ".venv")) {
         Write-Host "Сначала выполните 1 (Установка)." -ForegroundColor Red
         Pause-Continue; return
     }
     $runningPid = Get-RunningPid
     if ($runningPid) {
-        Write-Host "Служба уже запущена (PID $runningPid). Для перезапуска сначала остановите её (пункт 4)." -ForegroundColor Red
+        Write-Host "Служба уже запущена (PID $runningPid). Для перезапуска сначала остановите её (пункт 3)." -ForegroundColor Red
         Pause-Continue; return
     }
     $mod = Get-Config "module" "cpu"
@@ -358,7 +406,7 @@ function Do-Start {
         }
     }
     if (-not $mainexe) {
-        Write-Host "Ни один бинарник не найден. Сначала выполните 1 (Установка)." -ForegroundColor Red
+        Write-Host "Ни один бинарник не найден. Пункт 1  -  установка или переустановка." -ForegroundColor Red
         Pause-Continue; return
     }
 
@@ -367,7 +415,7 @@ function Do-Start {
         Write-Host "Проверка готовности не прошла:" -ForegroundColor Red
         $readyOut | ForEach-Object { Write-Host $_ }
         Write-Host ""
-        Write-Host "Сделайте: 1 (Установка), потом 2 (Проверка). Когда в пункте 2 будет OK — снова выберите 3."
+        Write-Host "Пункт 1 (установка / переустановка). Статус в шапке меню, затем снова 2."
         Pause-Continue; return
     }
 
@@ -376,7 +424,7 @@ function Do-Start {
     Write-Host "Режим: " -NoNewline; Write-Host $mod -NoNewline -ForegroundColor Cyan
     Write-Host ", Запись: " -NoNewline; Write-Host $hkr -NoNewline -ForegroundColor Cyan
     Write-Host ", Стоп: "  -NoNewline; Write-Host $hks -ForegroundColor Cyan
-    Write-Host "Остановить: пункт 4. Это окно можно закрыть."
+    Write-Host "Остановить: пункт 3. Это окно можно закрыть."
     $pythonw = Join-Path $PSScriptRoot ".venv\Scripts\pythonw.exe"
     Start-Process $pythonw -ArgumentList @("main.py", "--module", $mod) -WorkingDirectory $PSScriptRoot
 
@@ -389,13 +437,13 @@ function Do-Start {
     if (Test-Path ".roma-stt.pid") {
         Write-Host "Служба запущена." -ForegroundColor Green
     } else {
-        Write-Host "Служба не ответила за 6 секунд — возможна ошибка. Проверьте логи." -ForegroundColor Yellow
+        Write-Host "Служба не ответила за 6 секунд  -  возможна ошибка. Проверьте логи." -ForegroundColor Yellow
     }
     Pause-Continue
 }
 
 function Do-Stop {
-    Write-Host "[4] Остановка Roma-STT..." -ForegroundColor Cyan
+    Write-Host "[3] Остановка Roma-STT..." -ForegroundColor Cyan
     $stopped = $false
     if (Test-Path ".roma-stt.pid") {
         $pidVal = (Get-Content ".roma-stt.pid" -ErrorAction SilentlyContinue | Select-Object -First 1).Trim()
@@ -422,20 +470,20 @@ function Do-Stop {
 
 function Do-Models {
     Write-Host ""
-    Write-Host "[5] Модели распознавания" -ForegroundColor Cyan
+    Write-Host "[4] Модели распознавания" -ForegroundColor Cyan
     if (-not (Test-Path ".venv")) {
         Write-Host "Сначала выполните 1 (Установка)." -ForegroundColor Red
         Pause-Continue; return
     }
     & uv run python scripts/models.py list-all
-    $num = Read-Host "Номер (1-8) или название (Enter — в главное меню)"
+    $num = Read-Host "Номер (1-8) или название (Enter  -  в главное меню)"
     if (-not $num) { return }
     & uv run python scripts/models.py use $num
     Pause-Continue
 }
 
 function Do-ScanHotkeys {
-    Write-Host "[6] Подбор свободной горячей клавиши..." -ForegroundColor Cyan
+    Write-Host "[5] Подбор свободной горячей клавиши..." -ForegroundColor Cyan
     if (-not (Test-Path ".venv")) {
         Write-Host "Сначала выполните 1 (Установка)." -ForegroundColor Red
         Pause-Continue; return
@@ -449,7 +497,7 @@ function Do-ScanHotkeys {
 function Do-SetHotkey {
     param([string]$which)
     $isRecord = ($which -eq "record")
-    $label    = if ($isRecord) { "[7] Горячая клавиша записи" } else { "[8] Горячая клавиша стопа" }
+    $label    = if ($isRecord) { "[6] Горячая клавиша записи" } else { "[7] Горячая клавиша стопа" }
     $cfgKey   = if ($isRecord) { "hotkey_record" } else { "hotkey_stop" }
     $default  = if ($isRecord) { "Ctrl+F2" } else { "Ctrl+F3" }
     Write-Host "$label..." -ForegroundColor Cyan
@@ -459,23 +507,23 @@ function Do-SetHotkey {
     }
     $cur = Get-Config $cfgKey $default
     Write-Host "Сейчас: " -NoNewline; Write-Host $cur -ForegroundColor Cyan
-    Write-Host "Примеры: Ctrl+F2, Ctrl+Shift+F12. Enter — оставить текущую."
-    $new = Read-Host "Введите строку (Enter — оставить $cur)"
+    Write-Host "Примеры: Ctrl+F2, Ctrl+Shift+F12. Enter  -  оставить текущую."
+    $new = Read-Host "Введите строку (Enter  -  оставить $cur)"
     if (-not $new) { return }
     Set-Config $cfgKey $new
     Write-Host "Готово." -ForegroundColor Green
-    Write-Host "Перезапустите службу (пункт 4, затем 3), чтобы изменение вступило в силу."
+    Write-Host "Перезапустите службу (пункт 3, затем 2), чтобы изменение вступило в силу."
     Pause-Continue
 }
 
 function Do-SetLanguage {
-    Write-Host "[9] Выбрать язык..." -ForegroundColor Cyan
+    Write-Host "[8] Выбрать язык..." -ForegroundColor Cyan
     $cur = Get-Config "language" "ru"
     Write-Host "Текущий язык: " -NoNewline; Write-Host $cur -ForegroundColor Cyan
     Write-Host ""
     Write-Host "Примеры: ru, en, de, fr, es, it, jp, zh."
     while ($true) {
-        $new = Read-Host "Введите код языка (Enter — в главное меню)"
+        $new = Read-Host "Введите код языка (Enter  -  в главное меню)"
         if (-not $new) { return }
         if ($new -eq "russian") { Write-Host 'Используйте код "ru", а не "russian".' -ForegroundColor Red; continue }
         if ($new -eq "english") { Write-Host 'Используйте код "en", а не "english".' -ForegroundColor Red; continue }
@@ -486,64 +534,16 @@ function Do-SetLanguage {
 }
 
 function Do-SetInputDevice {
-    Write-Host "[10] Устройство ввода (микрофон)..." -ForegroundColor Cyan
+    Write-Host "[9] Устройство ввода (микрофон)..." -ForegroundColor Cyan
     if (-not (Test-Path ".venv")) {
         Write-Host "Сначала выполните 1 (Установка)." -ForegroundColor Red
         Pause-Continue; return
     }
     & uv run python scripts/list_audio_devices.py
-    $devnum = Read-Host "Номер устройства (Enter — в главное меню)"
+    $devnum = Read-Host "Номер устройства (Enter  -  в главное меню)"
     if (-not $devnum) { return }
     & uv run python scripts/list_audio_devices.py --set $devnum
     Pause-Continue
-}
-
-function Do-Remove {
-    Write-Host "[11] Удаление установки" -ForegroundColor Cyan
-    if (-not (Test-Path ".venv")) {
-        Write-Host "Удалять нечего — установка ещё не выполнялась." -ForegroundColor Red
-        Pause-Continue; return
-    }
-    Write-Host "Имеет смысл только если хотите всё удалить и поставить заново. После удаления снова выполните 1."
-    $confirm = Read-Host "Удалить .venv и models? (y/N, Enter — в главное меню)"
-    if (-not $confirm -or $confirm -notmatch "^[yY]$") { return }
-    if (Test-Path ".venv")  { Remove-Item ".venv"  -Recurse -Force }
-    if (Test-Path "models") { Remove-Item "models" -Recurse -Force }
-    Write-Host "Удалено. Для новой установки снова выберите пункт 1." -ForegroundColor Green
-    Pause-Continue
-}
-
-function Do-ToggleNotifications {
-    Write-Host "[12] Уведомления Windows..." -ForegroundColor Cyan
-    if (-not (Test-Path ".venv")) {
-        Write-Host "Сначала выполните 1 (Установка)." -ForegroundColor Red
-        Pause-Continue; return
-    }
-    $curVal = Get-Config "notifications" "False"
-    $cur = if ($curVal -eq "True") { "включены" } else { "выключены" }
-    Write-Host "Сейчас уведомления: " -NoNewline; Write-Host $cur -ForegroundColor Cyan
-    & uv run python -c "from infrastructure.config_repo import load_config, save_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); cfg['notifications']=not cfg.get('notifications', False); save_config(p,cfg)" 2>$null
-    $newVal = Get-Config "notifications" "False"
-    $new = if ($newVal -eq "True") { "включены" } else { "выключены" }
-    Write-Host "Уведомления теперь: $new" -ForegroundColor Green
-    Start-Sleep -Seconds 1
-}
-
-function Do-TogglePostprocess {
-    Write-Host "[13] Постобработка текста..." -ForegroundColor Cyan
-    if (-not (Test-Path ".venv")) {
-        Write-Host "Сначала выполните 1 (Установка)." -ForegroundColor Red
-        Pause-Continue; return
-    }
-    $curVal = Get-Config "postprocess" "True"
-    $cur = if ($curVal -ne "False") { "включена" } else { "выключена" }
-    Write-Host "Сейчас постобработка: " -NoNewline; Write-Host $cur -ForegroundColor Cyan
-    Write-Host "Что делает: заглавная буква, точка в конце, удаление [BLANK_AUDIO] и других артефактов Whisper."
-    & uv run python -c "from infrastructure.config_repo import load_config, save_config; from pathlib import Path; p=Path('config.yaml'); cfg=load_config(p); cfg['postprocess']=not cfg.get('postprocess', True); save_config(p,cfg)" 2>$null
-    $newVal = Get-Config "postprocess" "True"
-    $new = if ($newVal -ne "False") { "включена" } else { "выключена" }
-    Write-Host "Постобработка теперь: $new" -ForegroundColor Green
-    Start-Sleep -Seconds 1
 }
 
 # ---------------------------------------------------------------------------
@@ -556,6 +556,7 @@ if ($args.Count -gt 0) {
         "install"        { & uv run python scripts/install.py ($args[1..($args.Length-1)]); exit $LASTEXITCODE }
         "check"          { & uv run python scripts/check_ready.py; exit $LASTEXITCODE }
         "download"       { & uv run python scripts/download_model.py $args[1]; exit $LASTEXITCODE }
+        "download-vad"   { & uv run python scripts/download_vad_model.py; exit $LASTEXITCODE }
         "build-whisper"  { & uv run python scripts/build_whisper_cpp.py ($args[1..($args.Length-1)]); exit $LASTEXITCODE }
         "build-check"    { & uv run python scripts/check_build.py; exit $LASTEXITCODE }
         "setup"          { & uv run python scripts/install.py; if ($LASTEXITCODE -eq 0) { & uv run python scripts/check_ready.py }; exit $LASTEXITCODE }
@@ -573,23 +574,19 @@ if ($args.Count -gt 0) {
 
 while ($true) {
     Show-Menu
-    $choice = Read-Host "Введите цифру (1-14, Enter — обновить меню)"
+    $choice = Read-Host "Введите цифру (1-10, Enter  -  обновить меню)"
     switch ($choice) {
         "1"  { Do-Install }
-        "2"  { Do-Check }
-        "3"  { Do-Start }
-        "4"  { Do-Stop }
-        "5"  { Do-Models }
-        "6"  { Do-ScanHotkeys }
-        "7"  { Do-SetHotkey "record" }
-        "8"  { Do-SetHotkey "stop" }
-        "9"  { Do-SetLanguage }
-        "10" { Do-SetInputDevice }
-        "11" { Do-Remove }
-        "12" { Do-ToggleNotifications }
-        "13" { Do-TogglePostprocess }
-        "14" { exit 0 }
+        "2"  { Do-Start }
+        "3"  { Do-Stop }
+        "4"  { Do-Models }
+        "5"  { Do-ScanHotkeys }
+        "6"  { Do-SetHotkey "record" }
+        "7"  { Do-SetHotkey "stop" }
+        "8"  { Do-SetLanguage }
+        "9"  { Do-SetInputDevice }
+        "10" { exit 0 }
         ""   { }  # просто обновить меню
-        default { Write-Host "Неизвестный выбор. Введите цифру от 1 до 14." -ForegroundColor Red; Start-Sleep -Seconds 1 }
+        default { Write-Host "Неизвестный выбор. Введите цифру от 1 до 10." -ForegroundColor Red; Start-Sleep -Seconds 1 }
     }
 }

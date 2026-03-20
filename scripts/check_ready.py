@@ -97,14 +97,25 @@ def check_models_dir() -> tuple[bool, str]:
     return True, f"models/: {len(files)} file(s)"
 
 
-def main() -> int:
+def run_checks() -> tuple[bool, list[tuple[bool, str]]]:
+    """Return (all_ok, list of (ok, msg)) in display order."""
     checks = [check_uv(), check_venv(), check_models_dir(), check_config()]
-    all_ok = True
+    all_ok = all(ok for ok, _ in checks)
+    return all_ok, checks
+
+
+def main() -> int:
+    if "--summary" in sys.argv:
+        all_ok, checks = run_checks()
+        first_fail = next((m for ok, m in checks if not ok), "")
+        # Одна строка для меню: 1\t или 0\tпричина (табуляция в сообщениях маловероятна)
+        print(f"{'1' if all_ok else '0'}\t{first_fail}")
+        return 0 if all_ok else 1
+
+    all_ok, checks = run_checks()
     for ok, msg in checks:
         status = "OK" if ok else "FAIL"
         print(f"  [{status}] {msg}")
-        if not ok:
-            all_ok = False
     # Всегда показывать модуль из конфига и статус CUDA (nvcc)
     try:
         import yaml

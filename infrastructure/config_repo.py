@@ -21,8 +21,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "whisper_beam_size": 5,     # -bs: сколько вариантов beam search (больше = точнее, медленнее)
     "whisper_best_of": 5,       # -bo: сколько кандидатов сравнивать (для non-greedy)
     "whisper_prompt": "",       # --prompt: подсказка модели (имена, термины, стиль речи)
-    # Постобработка
-    "postprocess": True,        # заглавная буква, точка в конце, удаление артефактов whisper
+    "whisper_vad": True,        # --vad: только если есть файл модели (см. whisper_vad_model_path)
+    "whisper_vad_model_path": "models/ggml-silero-v6.2.0.bin",  # -vm; скачать: roma-stt.bat download-vad
 }
 
 
@@ -35,8 +35,9 @@ def load_config(config_path: str | Path) -> dict[str, Any]:
     data = yaml.safe_load(text) or {}
     out = dict(DEFAULT_CONFIG)
     out.update(data)
-    # Устаревший ключ — не используем и не сохраняем
+    # Устаревшие ключи — не используем и не сохраняем
     out.pop("hotkey", None)
+    out.pop("postprocess", None)  # постобработка всегда включена в main.py
     return out
 
 

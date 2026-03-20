@@ -1,5 +1,7 @@
 """Infrastructure: whisper.cpp subprocess — mock subprocess, check CLI args."""
 
+from pathlib import Path
+
 from unittest.mock import MagicMock, patch
 
 from domain.interfaces import STTEngine
@@ -24,6 +26,7 @@ def test_transcribe_calls_exe_with_m_and_f(mock_run):
     assert "ggml-base.ggml" in str(args[args.index("-m") + 1])
     assert "-f" in args
     assert "audio.wav" in str(args[args.index("-f") + 1])
+    assert "--vad" not in args
     assert result == "Hello world."
 
 
@@ -36,6 +39,28 @@ def test_transcribe_returns_stdout_stripped(mock_run):
 
 
 @patch("infrastructure.whisper_cpp_engine.subprocess.run")
+def test_transcribe_adds_vad_when_model_file_exists(mock_run, tmp_path: Path):
+    mock_run.return_value = MagicMock(stdout="ok", returncode=0)
+    vad = tmp_path / "vad.ggml"
+    vad.write_bytes(b"x")
+    engine = WhisperCppEngine(exe_path="w.exe", model_path="m.ggml")
+    engine.transcribe("a.wav", use_vad=True, vad_model_path=str(vad))
+    args = mock_run.call_args[0][0]
+    assert "--vad" in args
+    assert "-vm" in args
+    assert str(vad.resolve()) in args
+
+
+@patch("infrastructure.whisper_cpp_engine.subprocess.run")
+def test_transcribe_omits_vad_when_disabled(mock_run):
+    mock_run.return_value = MagicMock(stdout="x", returncode=0)
+    engine = WhisperCppEngine(exe_path="w.exe", model_path="m.ggml")
+    engine.transcribe("a.wav", use_vad=False)
+    args = mock_run.call_args[0][0]
+    assert "--vad" not in args
+
+
+@patch("infrastructure.whisper_cpp_engine.subprocess.run")
 def test_transcribe_passes_language(mock_run):
     mock_run.return_value = MagicMock(stdout="текст", returncode=0)
     engine = WhisperCppEngine(exe_path="w.exe", model_path="m.ggml")
@@ -43,6 +68,7 @@ def test_transcribe_passes_language(mock_run):
     args = mock_run.call_args[0][0]
     assert "-l" in args
     assert args[args.index("-l") + 1] == "ru"
+    assert "--vad" not in args
 
 
 @patch("infrastructure.whisper_cpp_engine.subprocess.run")
