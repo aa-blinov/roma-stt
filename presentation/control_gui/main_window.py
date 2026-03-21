@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import html
-import re
 import shutil
 from datetime import datetime
 from functools import partial
 from pathlib import Path
+
+from presentation.control_gui.hotkey_sort import sort_hotkey_labels
 
 from PySide6.QtCore import QProcess, QProcessEnvironment, Qt, QThread, QTimer, Signal
 from PySide6.QtGui import QBrush, QColor
@@ -37,19 +38,6 @@ def load_config_module(root: Path) -> str:
     from infrastructure.config_repo import load_config
 
     return str(load_config(root / "config.yaml").get("module") or "cpu")
-
-
-def _sort_hotkey_labels(items: list[str]) -> list[str]:
-    """Сортировка для выпадающих списков: по алфавиту, но F1…F12 по номеру (а не F10 перед F2)."""
-
-    def sort_key(s: str) -> tuple:
-        m = re.search(r"(?i)\bf\s*(\d{1,2})\b", s)
-        if m:
-            head = s[: m.start()].lower()
-            return (0, head, int(m.group(1)), s.lower())
-        return (1, s.lower())
-
-    return sorted(items, key=sort_key)
 
 
 def _whisper_language_choices() -> list[tuple[str, str]]:
@@ -795,7 +783,7 @@ QPushButton:disabled {
         for x in (rec, stp):
             if x:
                 bag.add(x)
-        items = _sort_hotkey_labels(list(bag))
+        items = sort_hotkey_labels(list(bag))
 
         def refill(combo: QComboBox, preferred: str) -> None:
             combo.blockSignals(True)
