@@ -146,3 +146,21 @@ def test_transcribe_no_retry_on_cuda_gpu_message(mock_run):
 
     assert mock_run.call_count == 1  # no retry
     assert result == "распознанный текст"
+
+
+@patch("infrastructure.whisper_cpp_engine.subprocess.run")
+def test_transcribe_retries_with_lower_beam_when_first_run_fails(mock_run):
+    """Large -bs/-bo on GPU can fail (e.g. exit 10); second attempt uses -bs 5 -bo 5."""
+    fail = MagicMock(returncode=10, stdout="", stderr="CUDA allocation failed")
+    ok = MagicMock(returncode=0, stdout="ok text", stderr="")
+    mock_run.side_effect = [fail, ok]
+
+    engine = WhisperCppEngine(exe_path="w.exe", model_path="m.ggml")
+    result = engine.transcribe("a.wav", n_gpu_layers=99, beam_size=10, best_of=8)
+
+    assert mock_run.call_count == 2
+    second_args = mock_run.call_args_list[1][0][0]
+    assert second_args[second_args.index("-bs") + 1] == "5"
+    assert second_args[second_args.index("-bo") + 1] == "5"
+    assert "-ngl" in second_args
+    assert result == "ok text"
