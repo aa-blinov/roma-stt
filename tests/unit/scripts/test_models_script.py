@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 import yaml
@@ -61,28 +61,72 @@ def test_use_by_number_skips_download_when_model_present(monkeypatch, roma_tmp_l
     monkeypatch.setattr(models_cli, "MODELS_DIR", models_dir_path)
     monkeypatch.setattr(models_cli, "CONFIG_PATH", cfg_path)
     monkeypatch.setattr(models_cli, "ROOT", roma_tmp_layout)
-    with patch.object(models_cli.subprocess, "run") as mock_run:
+    with patch("download_model.download") as mock_dl:
         models_cli.use_by_number("1")
-    mock_run.assert_not_called()
+    mock_dl.assert_not_called()
     data = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     assert "tiny" in data["whisper_model_path"]
 
 
 def test_use_by_number_downloads_then_sets_config(monkeypatch, roma_tmp_layout, models_dir_path: Path):
-    """Номер 2 → tiny-q8_0; пока файла нет — вызывается download_model, затем активируем."""
+    """Номер 2 → tiny-q8_0; пока файла нет — вызывается download_model.download, затем активируем."""
     cfg_path = roma_tmp_layout / "config.yaml"
     monkeypatch.setattr(models_cli, "MODELS_DIR", models_dir_path)
     monkeypatch.setattr(models_cli, "CONFIG_PATH", cfg_path)
     monkeypatch.setattr(models_cli, "ROOT", roma_tmp_layout)
 
-    def run_side_effect(cmd, cwd=None, **_kwargs):
-        assert "download_model.py" in str(cmd)
-        assert cwd == str(roma_tmp_layout)
-        (models_dir_path / "ggml-tiny-q8_0.bin").write_bytes(b"x")
-        return MagicMock(returncode=0)
+    def fake_download(name, dest_dir=None, *, on_progress=None):
+        assert name == "tiny-q8_0"
+        d = dest_dir or models_dir_path
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "ggml-tiny-q8_0.bin").write_bytes(b"x")
+        return True
 
-    with patch.object(models_cli.subprocess, "run", side_effect=run_side_effect):
+    with patch("download_model.download", side_effect=fake_download):
         models_cli.use_by_number("2")
 
     data = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
     assert "tiny-q8_0" in data["whisper_model_path"]
+
+
+def test_delete_downloaded_model_removes_file(monkeypatch, roma_tmp_layout, models_dir_path: Path):
+    bin_path = models_dir_path / "ggml-small.bin"
+    bin_path.write_bytes(b"x")
+    cfg_path = roma_tmp_layout / "config.yaml"
+    monkeypatch.setattr(models_cli, "MODELS_DIR", models_dir_path)
+    monkeypatch.setattr(models_cli, "CONFIG_PATH", cfg_path)
+    monkeypatch.setattr(models_cli, "ROOT", roma_tmp_layout)
+    ok, msg = models_cli.delete_downloaded_model("small")
+    assert ok
+    assert not bin_path.exists()
+    assert "Удалён" in msg
+
+
+def test_delete_downloaded_model_clears_config_when_active(monkeypatch, roma_tmp_layout, models_dir_path: Path):
+    bin_path = models_dir_path / "ggml-base.bin"
+    bin_path.write_bytes(b"x")
+    cfg_path = roma_tmp_layout / "config.yaml"
+    cfg_path.write_text(
+        yaml.dump(
+            {"whisper_model_path": str(bin_path.resolve())},
+            allow_unicode=True,
+            default_flow_style=False,
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(models_cli, "MODELS_DIR", models_dir_path)
+    monkeypatch.setattr(models_cli, "CONFIG_PATH", cfg_path)
+    monkeypatch.setattr(models_cli, "ROOT", roma_tmp_layout)
+    ok, msg = models_cli.delete_downloaded_model("base")
+    assert ok
+    assert not bin_path.exists()
+    data = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    assert data.get("whisper_model_path") == ""
+    assert "сброшена" in msg
+
+
+def test_delete_downloaded_model_not_downloaded(monkeypatch, models_dir_path: Path):
+    monkeypatch.setattr(models_cli, "MODELS_DIR", models_dir_path)
+    ok, msg = models_cli.delete_downloaded_model("small")
+    assert not ok
+    assert "не скачана" in msg

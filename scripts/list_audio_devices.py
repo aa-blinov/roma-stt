@@ -28,6 +28,50 @@ def list_input_devices() -> list[dict]:
     return result
 
 
+def set_input_device_index(device_index: int) -> tuple[bool, str]:
+    """Записать микрофон в config по индексу PortAudio (как --set)."""
+    try:
+        devices = list_input_devices()
+    except Exception as e:
+        return False, str(e)
+    indices = {d["index"]: d for d in devices}
+    if device_index not in indices:
+        return False, f"Номер {device_index} не найден в списке."
+    if not CONFIG_PATH.exists():
+        import yaml
+
+        config: dict = {}
+    else:
+        import yaml
+
+        config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8")) or {}
+    chosen = indices[device_index]
+    config["input_device"] = device_index
+    config["input_device_name"] = chosen["name"]
+    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    import yaml
+
+    CONFIG_PATH.write_text(
+        yaml.dump(config, allow_unicode=True, default_flow_style=False), encoding="utf-8"
+    )
+    return True, f"Записано: {device_index} — {chosen['name']}"
+
+
+def reset_input_device_default() -> tuple[bool, str]:
+    """Системный микрофон по умолчанию (как --default)."""
+    import yaml
+
+    if not CONFIG_PATH.exists():
+        return True, "config не найден — по умолчанию системный микрофон."
+    config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8")) or {}
+    config.pop("input_device", None)
+    config.pop("input_device_name", None)
+    CONFIG_PATH.write_text(
+        yaml.dump(config, allow_unicode=True, default_flow_style=False), encoding="utf-8"
+    )
+    return True, "Сброшено на системный микрофон по умолчанию."
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Список устройств ввода (микрофонов) для выбора в config."

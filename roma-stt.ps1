@@ -205,7 +205,7 @@ function Show-Menu {
     Write-Host "     Завершить работу Roma-STT в трее" -ForegroundColor DarkGray
     Write-Host " --- Настройки (после изменений: 3 -> 2) ---------------------" -ForegroundColor DarkGray
     Write-Host "  " -NoNewline; Write-Host " 4." -NoNewline -ForegroundColor Yellow; Write-Host " Модели распознавания       " -NoNewline; Write-Host "[$modelVal]" -ForegroundColor Cyan
-    Write-Host "     Список моделей  -  выбрать или скачать и выбрать" -ForegroundColor DarkGray
+    Write-Host "     Зелёный — файл уже в models; серый — не скачан; размер HF, сравнение, статус в строке (как в окне управления)" -ForegroundColor DarkGray
     Write-Host "  " -NoNewline; Write-Host " 5." -NoNewline -ForegroundColor Yellow; Write-Host " Подбор свободной горячей клавиши"
     Write-Host "     Протестировать F-клавиши и записать в config.yaml" -ForegroundColor DarkGray
     Write-Host "  " -NoNewline; Write-Host " 6." -NoNewline -ForegroundColor Yellow; Write-Host " Горячая клавиша записи     " -NoNewline; Write-Host "[$hkrVal]" -ForegroundColor Cyan
@@ -540,6 +540,14 @@ function Do-Models {
         Write-Host "Сначала выполните 1 (Установка)." -ForegroundColor Red
         Pause-Continue; return
     }
+    Write-Host ""
+    Write-Host "Модели Whisper (тот же смысл, что подсказка на вкладке «Модель» в окне управления):" -ForegroundColor DarkGray
+    Write-Host "  Строки зелёным — файл уже в папке models, серым — ещё не скачан."
+    Write-Host "  Для каждой строки указан примерный размер скачиваемого файла (ggerganov/whisper.cpp на Hugging Face)."
+    Write-Host "  В конце строки в скобках статус; перед скобками — краткое сравнение."
+    Write-Host "  Список обновляется при каждом входе в пункт 4; при скачивании в консоли виден ход загрузки (в GUI — полоса прогресса)."
+    Write-Host "  Номер или имя: если модель скачана — выберется активной; если нет — скачается и выберется (кнопка «Выбрать / скачать и выбрать»)."
+    Write-Host ""
     & uv run python scripts/models.py list-all
     $num = Read-Host "Номер из списка или название (Enter  -  в главное меню)"
     if (-not $num) { return }

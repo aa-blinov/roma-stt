@@ -1,8 +1,11 @@
 """Download ggml model from Hugging Face (multilingual only). For roma-stt.bat."""
 
+from __future__ import annotations
+
 import argparse
 import sys
 import urllib.request
+from collections.abc import Callable
 from pathlib import Path
 
 from whisper_models import ORDERED_MODEL_KEYS, model_download_url
@@ -15,8 +18,16 @@ MODELS = {key: model_download_url(key) for key in ORDERED_MODEL_KEYS}
 ORDERED_MODELS = list(ORDERED_MODEL_KEYS)
 
 
-def download(name: str, dest_dir: Path | None = None) -> bool:
-    """Download model by name. Returns True on success."""
+def download(
+    name: str,
+    dest_dir: Path | None = None,
+    *,
+    on_progress: Callable[[int, int], None] | None = None,
+) -> bool:
+    """Download model by name. Returns True on success.
+
+    on_progress(downloaded_bytes, total_bytes) — total_bytes 0, если сервер не прислал Content-Length.
+    """
     if name not in MODELS:
         print(f"Unknown model: {name}. Choose from: {', '.join(MODELS)}")
         return False
@@ -27,6 +38,9 @@ def download(name: str, dest_dir: Path | None = None) -> bool:
     path = dest_dir / filename
     if path.exists():
         print(f"Already exists: {path}")
+        if on_progress:
+            size = path.stat().st_size
+            on_progress(size, size)
         return True
     print(f"Downloading {name} from Hugging Face...")
     req = urllib.request.Request(url, headers={"User-Agent": "roma-stt/1.0"})
@@ -42,13 +56,16 @@ def download(name: str, dest_dir: Path | None = None) -> bool:
                         break
                     f.write(chunk)
                     downloaded += len(chunk)
-                    if total:
+                    if on_progress:
+                        on_progress(downloaded, total)
+                    elif total:
                         pct = 100 * downloaded / total
                         print(
                             f"\r  {downloaded // (1024 * 1024)} MiB / {total // (1024 * 1024)} MiB ({pct:.0f}%)",
                             end="",
                         )
-        print(f"\nSaved: {path}")
+        if not on_progress:
+            print(f"\nSaved: {path}")
         return True
     except Exception as e:
         print(f"\nDownload failed: {e}")

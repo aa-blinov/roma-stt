@@ -97,6 +97,22 @@ def _run_scan_in_thread(candidates: list[str]) -> tuple[list[str], list[tuple[st
     return free, busy
 
 
+def default_hotkey_candidates() -> list[str]:
+    """Список F-комбинаций для сканирования (как в main)."""
+    candidates: list[str] = []
+    for n in range(1, 13):
+        candidates.append(f"Ctrl+F{n}")
+    for n in range(1, 13):
+        candidates.append(f"Ctrl+Shift+F{n}")
+        candidates.append(f"Ctrl+Alt+F{n}")
+    return candidates
+
+
+def scan_free_hotkeys() -> tuple[list[str], list[tuple[str, str]]]:
+    """Для GUI/API: свободные и занятые комбинации без input()."""
+    return _run_scan_in_thread(default_hotkey_candidates())
+
+
 def load_config() -> dict:
     return load_config_repo(CONFIG_PATH)
 

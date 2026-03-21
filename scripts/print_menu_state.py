@@ -10,20 +10,11 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from infrastructure.config_repo import load_config
+from application.control.menu_state import get_menu_state
 
 
 def main() -> None:
-    cfg = load_config(ROOT / "config.yaml")
-    mp = cfg.get("whisper_model_path") or ""
-    model_stem = Path(mp).stem if mp else ""
-    data = {
-        "lang": cfg.get("language", "ru"),
-        "model_stem": model_stem,
-        "hotkey_record": cfg.get("hotkey_record", "Ctrl+F2"),
-        "hotkey_stop": cfg.get("hotkey_stop", "Ctrl+F3"),
-        "module": cfg.get("module", "cpu"),
-    }
+    data = get_menu_state(ROOT / "config.yaml")
     print(json.dumps(data, ensure_ascii=False))
 
 

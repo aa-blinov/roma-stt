@@ -18,6 +18,12 @@ dependencies = [
 dev = [
     "pytest",
 ]
+gui = [
+    "PySide6>=6.6",
+]
+
+[project.scripts]
+roma-stt-control = "presentation.control_gui.main:main"
 
 [build-system]
 requires = ["hatchling"]
